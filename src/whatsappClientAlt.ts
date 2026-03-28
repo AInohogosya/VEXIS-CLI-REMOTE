@@ -40,7 +40,8 @@ async function executeCommand(cmd: Command, messageContent: string, senderJid: s
             encoding: 'utf-8', 
             timeout: 300000,
             killSignal: 'SIGTERM',
-            stdio: ['pipe', 'pipe', 'pipe']
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` }
           });
           console.log(`[WA] [EXEC] Command: ${cmd.command}, Output: ${result.trim().substring(0, 100)}`);
           return `Exec result: ${result.trim().substring(0, 200)}`;
