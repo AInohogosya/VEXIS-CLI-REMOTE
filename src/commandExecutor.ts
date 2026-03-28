@@ -35,9 +35,20 @@ export function executeCommands(messageContent: string, senderJid: string, sende
 
         case 'exec':
           if (cmd.command) {
-            const result = execSync(cmd.command, { encoding: 'utf-8', timeout: 120000 });
-            console.log(`[Command:${cmd.name}] Executed: ${cmd.command}`);
-            results.push(`Exec: ${result.trim().substring(0, 200)}`);
+            try {
+              const result = execSync(cmd.command, {
+                encoding: 'utf-8',
+                timeout: 300000,
+                killSignal: 'SIGTERM',
+                stdio: ['pipe', 'pipe', 'pipe']
+              });
+              console.log(`[Command:${cmd.name}] Executed: ${cmd.command}`);
+              results.push(`Exec: ${result.trim().substring(0, 200)}`);
+            } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+              console.error(`[Command:${cmd.name}] Error:`, errorMsg);
+              results.push(`Error in ${cmd.name}: ${errorMsg}`);
+            }
           }
           break;
 

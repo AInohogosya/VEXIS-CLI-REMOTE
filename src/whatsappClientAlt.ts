@@ -36,7 +36,12 @@ async function executeCommand(cmd: Command, messageContent: string, senderJid: s
     case 'exec':
       if (cmd.command) {
         try {
-          const result = execSync(cmd.command, { encoding: 'utf-8', timeout: 30000 });
+          const result = execSync(cmd.command, { 
+            encoding: 'utf-8', 
+            timeout: 300000,
+            killSignal: 'SIGTERM',
+            stdio: ['pipe', 'pipe', 'pipe']
+          });
           console.log(`[WA] [EXEC] Command: ${cmd.command}, Output: ${result.trim().substring(0, 100)}`);
           return `Exec result: ${result.trim().substring(0, 200)}`;
         } catch (error) {
