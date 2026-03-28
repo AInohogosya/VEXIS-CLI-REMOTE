@@ -57,7 +57,7 @@ async function handleMessage(message: WhatsAppMessage): Promise<void> {
     console.log(`[WA] Processing message: "${messageContent}"`);
 
     // Execute ALL commands from command.json regardless of message content
-    const result = executeCommands(messageContent, senderJid, senderPhone);
+    const result = await executeCommands(messageContent, senderJid, senderPhone);
 
     // Send result back to WhatsApp
     await waSocket?.sendMessage(senderJid, { text: result });

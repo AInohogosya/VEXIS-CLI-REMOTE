@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 interface Command {
   name: string;
@@ -21,7 +21,34 @@ function loadCommands(): Command[] {
   }
 }
 
-export function executeCommands(messageContent: string, senderJid: string, senderPhone: string): string {
+function execWithOutput(command: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const [cmd, ...args] = command.split(' ');
+    const child = spawn(cmd, args, {
+      stdio: ['pipe', 'inherit', 'inherit'],
+      shell: true
+    });
+
+    let output = '';
+    child.stdout?.on('data', (data) => {
+      output += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(output);
+      } else {
+        reject(new Error(`Command exited with code ${code}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+export async function executeCommands(messageContent: string, senderJid: string, senderPhone: string): Promise<string> {
   const commands = loadCommands();
   const results: string[] = [];
 
@@ -36,14 +63,9 @@ export function executeCommands(messageContent: string, senderJid: string, sende
         case 'exec':
           if (cmd.command) {
             try {
-              const result = execSync(cmd.command, {
-                encoding: 'utf-8',
-                timeout: 300000,
-                killSignal: 'SIGTERM',
-                stdio: ['pipe', 'pipe', 'pipe']
-              });
-              console.log(`[Command:${cmd.name}] Executed: ${cmd.command}`);
-              results.push(`Exec: ${result.trim().substring(0, 200)}`);
+              console.log(`[Command:${cmd.name}] Executing: ${cmd.command}`);
+              const result = await execWithOutput(cmd.command);
+              results.push(`Exec: ${cmd.name} completed`);
             } catch (error) {
               const errorMsg = error instanceof Error ? error.message : 'Unknown error';
               console.error(`[Command:${cmd.name}] Error:`, errorMsg);
