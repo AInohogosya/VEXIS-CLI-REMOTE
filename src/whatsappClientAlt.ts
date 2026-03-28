@@ -2,7 +2,7 @@ import { Client } from 'whatsapp-web.js';
 import { config } from './config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 // Command interface
 interface Command {
@@ -24,6 +24,31 @@ function loadCommands(): Command[] {
   }
 }
 
+// Execute a single command with real-time output
+function execWithOutput(command: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    console.log(`[WA] [EXEC] Starting: ${command}`);
+    
+    const child = spawn(command, {
+      stdio: ['pipe', 'inherit', 'inherit'],
+      shell: true,
+      env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` }
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve('');
+      } else {
+        reject(new Error(`Command exited with code ${code}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
 // Execute a single command
 async function executeCommand(cmd: Command, messageContent: string, senderJid: string): Promise<string> {
   console.log(`[WA] Executing command: ${cmd.name} (${cmd.action})`);
@@ -36,15 +61,11 @@ async function executeCommand(cmd: Command, messageContent: string, senderJid: s
     case 'exec':
       if (cmd.command) {
         try {
-          const result = execSync(cmd.command, { 
-            encoding: 'utf-8', 
-            timeout: 300000,
-            killSignal: 'SIGTERM',
-            stdio: ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` }
-          });
-          console.log(`[WA] [EXEC] Command: ${cmd.command}, Output: ${result.trim().substring(0, 100)}`);
-          return `Exec result: ${result.trim().substring(0, 200)}`;
+          // Replace {{message}} placeholder with actual message content
+          const actualCommand = cmd.command.replace(/\{\{message\}\}/g, messageContent);
+          await execWithOutput(actualCommand);
+          console.log(`[WA] [EXEC] Command completed: ${actualCommand}`);
+          return `Exec result: ${cmd.name} completed`;
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           console.error(`[WA] [EXEC ERROR] ${errorMsg}`);
