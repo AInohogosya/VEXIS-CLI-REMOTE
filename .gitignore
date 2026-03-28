@@ -1,0 +1,12 @@
+# Node.js dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Local logs and history
+terminal_history/
+work_logs/
+
+# Optional OS files
+.DS_Store

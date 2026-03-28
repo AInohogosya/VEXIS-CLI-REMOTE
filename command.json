@@ -1,0 +1,8 @@
+[
+  {
+    "name": "run_vexis",
+    "action": "exec",
+    "command": "vexis-cli --no-prompt \"message received from user\"",
+    "description": "Remove settings.json and run VEXIS with the received message"
+  }
+]
