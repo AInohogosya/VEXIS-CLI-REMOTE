@@ -67,14 +67,10 @@ sed -i 's/OWN_PHONE_NUMBER=/OWN_PHONE_NUMBER=+1234567890/' .env
 Edit `.env`:
 
 ```env
-# WhatsApp configuration
+# WhatsApp configuration (required)
 OWN_PHONE_NUMBER=+1234567890
 
-# Ollama configuration (optional)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
-
-# Logging configuration
+# Logging configuration (optional)
 LOG_LEVEL=info
 ```
 
@@ -196,8 +192,6 @@ By default, `command.json` is configured to run VEXIS-CLI:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OWN_PHONE_NUMBER` | Yes | - | Your WhatsApp number with country code |
-| `OLLAMA_BASE_URL` | No | - | Ollama API endpoint |
-| `OLLAMA_MODEL` | No | - | Model name for AI responses |
 | `LOG_LEVEL` | No | `info` | Logging verbosity |
 
 ---
@@ -210,8 +204,7 @@ VEXIS-CLI-Remote/
 │   ├── index.ts                 # Application entry point
 │   ├── whatsappClientAlt.ts     # WhatsApp → VEXIS-CLI bridge logic
 │   ├── commandExecutor.ts       # Command execution engine
-│   ├── config.ts                # Environment configuration
-│   └── ollamaClient.ts          # Additional AI integration (optional)
+│   └── config.ts                # Environment configuration
 ├── command.json                 # VEXIS-CLI command configuration
 ├── .env                         # Environment variables
 ├── .env.example                 # Environment template
@@ -258,7 +251,6 @@ Please make sure to update tests as appropriate and follow the [Code of Conduct]
 
 - [x] VEXIS-CLI integration via WhatsApp
 - [x] Command execution via JSON
-- [x] Ollama AI support (optional enhancement)
 - [ ] Docker containerization
 - [ ] Web dashboard for command management
 - [ ] Multi-user support with permission levels
@@ -278,7 +270,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 - [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) — WhatsApp Web API
 - [Baileys](https://github.com/WhiskeySockets/Baileys) — Alternative WhatsApp library
-- [Ollama](https://ollama.com/) — Local LLM runner
 - [Puppeteer](https://pptr.dev/) — Browser automation
 
 ---
