@@ -1,4 +1,4 @@
-# 🤖 VEXIS-CLI-Remote Beta-1
+# VEXIS-CLI-Remote Beta-2
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com)
