@@ -62,15 +62,16 @@ See [VEXIS-CLI-2 README](./VEXIS-CLI-2/README.md) for detailed documentation.
 
 From the repository root (`VEXIS-CLI-REMOTE`):
 
+**Start the server** (to receive messages):
 ```bash
-npm install:mail
-npm start
+npm run server
 ```
 
-Or run directly:
+Then type `/login` to authenticate.
 
+**Optional - Start the CLI** (to send messages, in another terminal):
 ```bash
-cd VEXIS-mail-CLI && node index.js
+npm start
 ```
 
 See [VEXIS-mail-CLI README](./VEXIS-mail-CLI/README.md) for details.

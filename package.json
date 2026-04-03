@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node scripts/run.js npm start",
     "mail": "node scripts/run.js npm start",
+    "server": "node scripts/start-server.js",
     "forwarder": "node scripts/run.js npm run forwarder",
     "setup-mail": "node scripts/run.js npm install"
   },
