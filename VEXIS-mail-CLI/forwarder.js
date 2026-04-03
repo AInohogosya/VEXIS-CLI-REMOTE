@@ -34,29 +34,19 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as readline from 'readline';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { config } from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables from .env file
-config({ path: join(__dirname, '.env') });
-
-// Firebase config from environment variables
+// Firebase config
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
+  apiKey: "AIzaSyCgBfSlqZXwraxuxFAxZKG0GXHv-XP7umE",
+  authDomain: "vexis.cli-remote-f6f4c.firebaseapp.com",
+  projectId: "vexis-cli-remote-f6f4c",
+  storageBucket: "vexis-cli-remote-f6f4c.firebasestorage.app",
+  messagingSenderId: "420034681058",
+  appId: "1:420034681058:web:86f601782961cf5d12e6bb"
 };
-
-// Validate Firebase config
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('Error: Firebase configuration is missing. Please create a .env file based on .env.example');
-  process.exit(1);
-}
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
