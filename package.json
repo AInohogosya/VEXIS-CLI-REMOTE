@@ -7,7 +7,7 @@
     "start": "node scripts/run.js npm start",
     "mail": "node scripts/run.js npm start",
     "forwarder": "node scripts/run.js npm run forwarder",
-    "install:mail": "node scripts/run.js npm install"
+    "setup-mail": "node scripts/run.js npm install"
   },
   "keywords": ["cli", "ai", "automation", "chat"],
   "license": "MIT"

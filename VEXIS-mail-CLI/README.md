@@ -7,7 +7,7 @@ A CLI-based chat application for VEXIS Agent.
 From the `VEXIS-CLI-REMOTE` root directory:
 
 ```bash
-npm install:mail
+npm run setup-mail
 ```
 
 Or directly in the subdirectory:

@@ -97,7 +97,7 @@ cd VEXIS-CLI-REMOTE
 From the repository root:
 
 ```bash
-npm install:mail
+npm run setup-mail
 ```
 
 ---
