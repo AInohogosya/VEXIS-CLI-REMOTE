@@ -38,13 +38,25 @@ See [VEXIS-CLI-2 README](./VEXIS-CLI-2/README.md) for detailed documentation.
 
 ## 💬 VEXIS-mail-CLI
 
-**Real-time chat CLI application** powered by Firebase for instant messaging.
+**Real-time chat CLI application** for VEXIS Agent with Firebase-powered messaging and user authentication.
 
 ### Key Features
 
-- Real-time messaging via Firebase
-- Forwarder component for message relay
-- Simple command-line interface
+- User authentication (login/register/logout)
+- Real-time chat messaging via Firebase Firestore
+- Message history synchronization
+- Interactive command-line interface
+- Forwarder component for message relay (auxiliary)
+
+### Available Commands
+
+- `/login` - Login to your account
+- `/register` - Create a new account
+- `/logout` - Logout from current session
+- `/chat` - Start chat mode (after login)
+- `/clear` - Clear the screen
+- `/help` - Show help message
+- `/exit` - Exit the application
 
 ### Quick Start
 
@@ -52,6 +64,12 @@ See [VEXIS-CLI-2 README](./VEXIS-CLI-2/README.md) for detailed documentation.
 cd VEXIS-mail-CLI
 npm install
 npm start
+```
+
+Or run directly:
+
+```bash
+node index.js
 ```
 
 See [VEXIS-mail-CLI README](./VEXIS-mail-CLI/README.md) for details.

@@ -34,19 +34,29 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as readline from 'readline';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { config } from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Firebase config (same as VEXIS-mail-CLI)
+// Load environment variables from .env file
+config({ path: join(__dirname, '.env') });
+
+// Firebase config from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyCgBfSlqZXwraxuxFAxZKG0GXHv-XP7umE",
-  authDomain: "vexis-cli-remote-f6f4c.firebaseapp.com",
-  projectId: "vexis-cli-remote-f6f4c",
-  storageBucket: "vexis-cli-remote-f6f4c.firebasestorage.app",
-  messagingSenderId: "420034681058",
-  appId: "1:420034681058:web:86f601782961cf5d12e6bb"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID
 };
+
+// Validate Firebase config
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('Error: Firebase configuration is missing. Please create a .env file based on .env.example');
+  process.exit(1);
+}
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -299,48 +309,62 @@ function startMessageListener(uid) {
   console.log(`[Forwarder] Mode: --no-prompt (automatic model selection)`);
   console.log(`\n[Forwarder] Waiting for messages...`);
   console.log(`[Forwarder] Press Ctrl+C to stop\n`);
-  
+
   const q = query(
     collection(db, `conversations/${uid}/messages`),
     orderBy('timestamp', 'asc')
   );
-  
-  let lastMessageCount = 0;
-  
+
+  const listenerStartTime = new Date();
+
   return onSnapshot(q, (snapshot) => {
-    const currentCount = snapshot.docs.length;
-    console.log(`[Forwarder] Snapshot received: ${currentCount} messages total`);
-    
-    // Only process if there are new messages
-    if (currentCount > lastMessageCount) {
-      console.log(`[Forwarder] New messages detected: ${currentCount - lastMessageCount} new`);
-      // Get only the new messages
-      const newDocs = snapshot.docs.slice(lastMessageCount);
-      
-      for (const docSnap of newDocs) {
-        const data = docSnap.data();
-        const messageId = docSnap.id;
-        console.log(`[Forwarder] Processing doc: ${messageId}, role: ${data.role}, content: "${data.content?.substring(0, 30)}..."`);
-        
-        // Only process user messages that haven't been processed
-        if (data.role === 'user' && !processedMessageIds.has(messageId)) {
-          processedMessageIds.add(messageId);
-          
-          // Skip if message is empty or too short
-          if (!data.content || data.content.trim().length === 0) {
-            console.log(`[Forwarder] Skipping empty message`);
-            continue;
-          }
-          
-          console.log(`\n[Forwarder] New user message received: "${data.content.substring(0, 50)}..."`);
-          
-          // Process the message
-          processMessage(data, uid);
-        }
+    console.log(`[Forwarder] ===== SNAPSHOT =====`);
+    console.log(`[Forwarder] Docs: ${snapshot.docs.length}, Changes: ${snapshot.docChanges().length}`);
+
+    const changes = snapshot.docChanges();
+
+    for (const change of changes) {
+      const docSnap = change.doc;
+      const data = docSnap.data();
+      const messageId = docSnap.id;
+
+      console.log(`[Forwarder] Change: type=${change.type}, ID=${messageId}, role=${data.role}`);
+
+      // Only process newly added documents
+      if (change.type !== 'added') {
+        console.log(`[Forwarder]   -> Skip: not 'added'`);
+        continue;
       }
-      
-      lastMessageCount = currentCount;
+
+      // Only process user messages
+      if (data.role !== 'user') {
+        console.log(`[Forwarder]   -> Skip: role='${data.role}'`);
+        continue;
+      }
+
+      // Skip empty messages
+      if (!data.content || data.content.trim().length === 0) {
+        console.log(`[Forwarder]   -> Skip: empty content`);
+        continue;
+      }
+
+      // Check timestamp - skip old messages from before listener started
+      let messageTimestamp = null;
+      if (data.timestamp) {
+        messageTimestamp = data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
+      }
+
+      // Skip if timestamp exists and is older than listener start time
+      if (messageTimestamp && messageTimestamp < listenerStartTime) {
+        console.log(`[Forwarder]   -> Skip: old message (${messageTimestamp.toISOString()} < ${listenerStartTime.toISOString()})`);
+        continue;
+      }
+
+      console.log(`[Forwarder]   -> PROCESS: "${data.content.substring(0, 50)}..."`);
+      processMessage(data, uid);
     }
+  }, (error) => {
+    console.error(`[Forwarder] SNAPSHOT ERROR:`, error.message);
   });
 }
 

@@ -78,6 +78,10 @@ web_modules/
 .env.production.local
 .env.local
 
+# Firebase config files that might contain secrets
+firebase-config.json
+serviceAccountKey.json
+
 # Lock files (uncomment if you want to exclude)
 package-lock.json
 yarn.lock
