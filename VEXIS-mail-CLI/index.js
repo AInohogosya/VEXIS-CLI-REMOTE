@@ -18,6 +18,13 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import * as readline from 'readline';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const SETTINGS_FILE = join(__dirname, 'cli_settings.json');
 
 const firebaseConfig = {
   apiKey: "AIzaSyCgBfSlqZXwraxuxFAxZKG0GXHv-XP7umE",
@@ -41,6 +48,31 @@ let currentUid = null;
 let unsubscribe = null;
 let isChatMode = false;
 
+// Default settings (Ollama only)
+let settings = {
+  provider: 'ollama',
+  model: 'qwen3.5:2b'
+};
+
+function loadSettings() {
+  try {
+    if (existsSync(SETTINGS_FILE)) {
+      const data = readFileSync(SETTINGS_FILE, 'utf8');
+      settings = JSON.parse(data);
+    }
+  } catch (error) {
+    // Use defaults
+  }
+}
+
+function saveSettings() {
+  try {
+    writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  } catch (error) {
+    console.log('Error saving settings:', error.message);
+  }
+}
+
 function question(prompt) {
   return new Promise((resolve) => {
     rl.question(prompt, resolve);
@@ -60,6 +92,8 @@ function printHelp() {
   console.log('  /login    - Login to your account');
   console.log('  /register - Create a new account');
   console.log('  /logout   - Logout from current session');
+  console.log('  /chat     - Start chat mode');
+  console.log('  /setting  - Configure model (Ollama only)');
   console.log('  /clear    - Clear the screen');
   console.log('  /help     - Show this help message');
   console.log('  /exit     - Exit the application');
@@ -109,7 +143,7 @@ async function sendMessage(text) {
   
   try {
     await addDoc(collection(db, `conversations/${currentUid}/messages`), {
-      role: "assistant",
+      role: "user",
       content: text.trim(),
       timestamp: serverTimestamp(),
       read: false
@@ -143,6 +177,31 @@ function startChatListener() {
   });
 }
 
+async function handleSetting() {
+  console.log('\n=== Model Settings (Ollama only) ===');
+  console.log(`Current model: ${settings.model}`);
+  console.log('');
+  
+  const model = await question('Enter model name: ');
+  
+  if (!model.trim()) {
+    console.log('✗ Model name cannot be empty\n');
+    return;
+  }
+  
+  settings.model = model.trim();
+  saveSettings();
+  console.log(`✓ Model updated: ${settings.model}\n`);
+}
+
+async function handleChat() {
+  if (!currentUid) {
+    console.log('Please login first.\n');
+    return;
+  }
+  startChatMode();
+}
+
 function startChatMode() {
   isChatMode = true;
   console.log('\n--- Chat Mode ---');
@@ -157,6 +216,14 @@ async function handleCommand(input) {
   const cmd = input.trim().toLowerCase();
   
   switch (cmd) {
+    case '/chat':
+      await handleChat();
+      break;
+      
+    case '/setting':
+      await handleSetting();
+      break;
+      
     case '/login':
       if (currentUid) {
         console.log('Already logged in. Use /logout first.');
@@ -237,5 +304,6 @@ onAuthStateChanged(auth, (user) => {
 
 printHeader();
 printHelp();
+loadSettings();
 console.log('Type /login or /register to get started.\n');
 promptLoop();
