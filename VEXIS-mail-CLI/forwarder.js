@@ -301,7 +301,8 @@ function startMessageListener(uid) {
   console.log(`[Forwarder] Press Ctrl+C to stop\n`);
   
   const q = query(
-    collection(db, `conversations/${uid}/messages`)
+    collection(db, `conversations/${uid}/messages`),
+    orderBy('timestamp', 'asc')
   );
   
   let lastMessageCount = 0;
