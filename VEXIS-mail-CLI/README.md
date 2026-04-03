@@ -4,20 +4,31 @@ A CLI-based chat application for VEXIS Agent.
 
 ## Installation
 
+From the `VEXIS-CLI-REMOTE` root directory:
+
 ```bash
-npm install
+npm install:mail
 ```
 
-## Usage
+Or directly in the subdirectory:
 
 ```bash
+cd VEXIS-mail-CLI && npm install
+```
+
+## Quick Start
+
+From the `VEXIS-CLI-REMOTE` root directory:
+
+```bash
+npm install:mail
 npm start
 ```
 
 Or run directly:
 
 ```bash
-node index.js
+cd VEXIS-mail-CLI && node index.js
 ```
 
 ## Commands
@@ -25,6 +36,8 @@ node index.js
 - `/login` - Login to your account (requires valid email/password)
 - `/register` - Create a new account
 - `/logout` - Logout from current session
+- `/chat` - Start chat mode (requires login)
+- `/setting` - Configure model settings (Ollama only)
 - `/clear` - Clear the screen
 - `/help` - Show help message
 - `/exit` - Exit the application

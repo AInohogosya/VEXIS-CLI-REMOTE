@@ -60,16 +60,17 @@ See [VEXIS-CLI-2 README](./VEXIS-CLI-2/README.md) for detailed documentation.
 
 ### Quick Start
 
+From the repository root (`VEXIS-CLI-REMOTE`):
+
 ```bash
-cd VEXIS-mail-CLI
-npm install
+npm install:mail
 npm start
 ```
 
 Or run directly:
 
 ```bash
-node index.js
+cd VEXIS-mail-CLI && node index.js
 ```
 
 See [VEXIS-mail-CLI README](./VEXIS-mail-CLI/README.md) for details.
@@ -89,6 +90,14 @@ See [VEXIS-mail-CLI README](./VEXIS-mail-CLI/README.md) for details.
 ```bash
 git clone https://github.com/AInohogosya/VEXIS-CLI-REMOTE.git
 cd VEXIS-CLI-REMOTE
+```
+
+### Setup VEXIS-mail-CLI
+
+From the repository root:
+
+```bash
+npm install:mail
 ```
 
 ---
