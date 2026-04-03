@@ -21,7 +21,7 @@ cd VEXIS-mail-CLI && npm install
 From the `VEXIS-CLI-REMOTE` root directory:
 
 ```bash
-npm install:mail
+npm run setup-mail
 npm start
 ```
 
