@@ -38,12 +38,14 @@ See [VEXIS-CLI-2 README](./VEXIS-CLI-2/README.md) for detailed documentation.
 
 ## 💬 VEXIS-mail-CLI
 
-**Real-time chat CLI application** for VEXIS Agent with Firebase-powered messaging and user authentication.
+**Real-time chat CLI application** for VEXIS Agent.
+
+**Note:** Use https://ainohogosya.github.io/VEXIS-Chat/ as the messaging app.
 
 ### Key Features
 
 - User authentication (login/register/logout)
-- Real-time chat messaging via Firebase Firestore
+- Real-time chat messaging
 - Message history synchronization
 - Interactive command-line interface
 - Forwarder component for message relay (auxiliary)
