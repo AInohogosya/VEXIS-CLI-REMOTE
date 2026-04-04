@@ -54,6 +54,14 @@ if (!existsSync(NODE_MODULES)) {
 function startForwarder() {
   console.log('🚀 Starting VEXIS Mail Server...');
   console.log('');
+  console.log('📋 Available commands:');
+  console.log('   /login   - Login to your account');
+  console.log('   /register - Create a new account');
+  console.log('   /setting  - Configure model settings (Ollama only)');
+  console.log('   /chat     - Start chat mode (requires login)');
+  console.log('   /logout   - Logout from current session');
+  console.log('   /help     - Show help message');
+  console.log('');
   
   const forwarder = spawn('npm', ['run', 'forwarder'], {
     cwd: TARGET_DIR,

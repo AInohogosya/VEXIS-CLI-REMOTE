@@ -20,16 +20,8 @@ cd VEXIS-mail-CLI && npm install
 
 From the `VEXIS-CLI-REMOTE` root directory:
 
-**Start the server** (to receive messages):
 ```bash
 npm run server
-```
-
-Then type `/login` to authenticate.
-
-**Optional - Start the CLI** (to send messages, in another terminal):
-```bash
-npm start
 ```
 
 ## Commands
