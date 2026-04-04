@@ -76,10 +76,29 @@ const VALID_PROVIDERS = [
   'amazon', 'cohere', 'minimax', 'zhipuai'
 ];
 
+// API key environment variable mapping for each provider
+const API_KEY_ENV_VARS = {
+  'google': 'GOOGLE_API_KEY',
+  'openai': 'OPENAI_API_KEY',
+  'anthropic': 'ANTHROPIC_API_KEY',
+  'xai': 'XAI_API_KEY',
+  'meta': 'META_API_KEY',
+  'groq': 'GROQ_API_KEY',
+  'deepseek': 'DEEPSEEK_API_KEY',
+  'together': 'TOGETHER_API_KEY',
+  'microsoft': 'AZURE_API_KEY',
+  'mistral': 'MISTRAL_API_KEY',
+  'amazon': ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
+  'cohere': 'COHERE_API_KEY',
+  'minimax': 'MINIMAX_API_KEY',
+  'zhipuai': 'ZHIPUAI_API_KEY'
+};
+
 // Default settings
 let settings = {
   provider: 'ollama',
-  model: 'qwen3.5:2b'
+  model: 'qwen3.5:2b',
+  apiKeys: {}  // Store API keys for each provider
 };
 
 /**
@@ -90,6 +109,10 @@ function loadSettings() {
     if (existsSync(SETTINGS_FILE)) {
       const data = readFileSync(SETTINGS_FILE, 'utf8');
       settings = JSON.parse(data);
+      // Ensure apiKeys exists for backward compatibility
+      if (!settings.apiKeys) {
+        settings.apiKeys = {};
+      }
       console.log(`[Forwarder] Loaded settings: provider=${settings.provider}, model=${settings.model}`);
     }
   } catch (error) {
@@ -134,9 +157,32 @@ function executeVEXISCLI2(instruction) {
       '--model', settings.model
     ];
     
+    // Prepare environment with API keys for non-Ollama providers
+    const env = { ...process.env };
+    if (settings.provider !== 'ollama' && settings.apiKeys) {
+      const envVar = API_KEY_ENV_VARS[settings.provider];
+      if (envVar) {
+        if (Array.isArray(envVar)) {
+          // For providers requiring multiple keys (e.g., Amazon)
+          envVar.forEach(varName => {
+            if (settings.apiKeys[varName]) {
+              env[varName] = settings.apiKeys[varName];
+              console.log(`[Forwarder] Setting ${varName}: ${settings.apiKeys[varName].substring(0, 10)}...`);
+            }
+          });
+        } else {
+          // For providers requiring single key
+          if (settings.apiKeys[envVar]) {
+            env[envVar] = settings.apiKeys[envVar];
+            console.log(`[Forwarder] Setting ${envVar}: ${settings.apiKeys[envVar].substring(0, 10)}...`);
+          }
+        }
+      }
+    }
+    
     const pythonProcess = spawn('python3', args, {
       cwd: dirname(VEXIS_CLI_2_PATH),
-      env: { ...process.env }
+      env: env
     });
     
     let stdout = '';
@@ -436,6 +482,59 @@ async function main() {
         if (!model.trim()) {
           console.log('[Forwarder] ✗ Model name cannot be empty\n');
         } else {
+          // Prompt for API key if not Ollama (which doesn't need an API key)
+          if (provider !== 'ollama') {
+            const envVar = API_KEY_ENV_VARS[provider];
+            console.log(`[Forwarder] Provider "${provider}" requires an API key.`);
+            
+            if (Array.isArray(envVar)) {
+              // Special case for Amazon (needs two keys)
+              console.log(`[Forwarder] Required environment variables: ${envVar.join(', ')}`);
+              const existingKey1 = settings.apiKeys[envVar[0]];
+              const existingKey2 = settings.apiKeys[envVar[1]];
+              if (existingKey1 && existingKey2) {
+                console.log(`[Forwarder] API keys already configured for ${provider}`);
+                const useExisting = await question('Use existing keys? (Y/n): ');
+                if (useExisting.trim().toLowerCase() === 'n') {
+                  const accessKey = await question('AWS Access Key ID: ');
+                  const secretKey = await question('AWS Secret Access Key: ');
+                  if (accessKey.trim() && secretKey.trim()) {
+                    settings.apiKeys[envVar[0]] = accessKey.trim();
+                    settings.apiKeys[envVar[1]] = secretKey.trim();
+                  }
+                }
+              } else {
+                const accessKey = await question('AWS Access Key ID: ');
+                const secretKey = await question('AWS Secret Access Key: ');
+                if (accessKey.trim() && secretKey.trim()) {
+                  settings.apiKeys[envVar[0]] = accessKey.trim();
+                  settings.apiKeys[envVar[1]] = secretKey.trim();
+                } else {
+                  console.log('[Forwarder] ✗ Both AWS keys are required. API not saved.\n');
+                }
+              }
+            } else {
+              // Single API key for other providers
+              console.log(`[Forwarder] Environment variable: ${envVar}`);
+              const existingKey = settings.apiKeys[envVar];
+              if (existingKey) {
+                console.log(`[Forwarder] API key already configured for ${provider}`);
+                const useExisting = await question('Use existing key? (Y/n): ');
+                if (useExisting.trim().toLowerCase() === 'n') {
+                  const apiKey = await question('API Key: ');
+                  if (apiKey.trim()) {
+                    settings.apiKeys[envVar] = apiKey.trim();
+                  }
+                }
+              } else {
+                const apiKey = await question('API Key: ');
+                if (apiKey.trim()) {
+                  settings.apiKeys[envVar] = apiKey.trim();
+                }
+              }
+            }
+          }
+          
           settings.provider = provider;
           settings.model = model.trim();
           saveSettings();
