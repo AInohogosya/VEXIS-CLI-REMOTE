@@ -88,12 +88,18 @@ class SettingsManager:
         self.logger.info("OpenAI API key updated")
     
     def get_google_api_key(self) -> Optional[str]:
-        """Get Google API key"""
-        return self._settings.google_api_key
+        """Get Google API key - checks internal settings first, then environment variable"""
+        if self._settings.google_api_key:
+            return self._settings.google_api_key
+        # Fallback to environment variable
+        return os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     
     def get_groq_api_key(self) -> Optional[str]:
-        """Get Groq API key"""
-        return self._settings.groq_api_key
+        """Get Groq API key - checks internal settings first, then environment variable"""
+        if self._settings.groq_api_key:
+            return self._settings.groq_api_key
+        # Fallback to environment variable
+        return os.getenv("GROQ_API_KEY")
     
     def get_preferred_provider(self) -> str:
         """Get preferred provider"""
@@ -118,8 +124,11 @@ class SettingsManager:
         self.logger.info("Groq API key cleared")
     
     def get_openai_api_key(self) -> Optional[str]:
-        """Get OpenAI API key"""
-        return self._settings.openai_api_key
+        """Get OpenAI API key - checks internal settings first, then environment variable"""
+        if self._settings.openai_api_key:
+            return self._settings.openai_api_key
+        # Fallback to environment variable
+        return os.getenv("OPENAI_API_KEY")
     
     def has_openai_api_key(self) -> bool:
         """Check if OpenAI API key is available"""
@@ -132,8 +141,11 @@ class SettingsManager:
         self.logger.info("Anthropic API key updated")
     
     def get_anthropic_api_key(self) -> Optional[str]:
-        """Get Anthropic API key"""
-        return self._settings.anthropic_api_key
+        """Get Anthropic API key - checks internal settings first, then environment variable"""
+        if self._settings.anthropic_api_key:
+            return self._settings.anthropic_api_key
+        # Fallback to environment variable
+        return os.getenv("ANTHROPIC_API_KEY")
     
     def has_anthropic_api_key(self) -> bool:
         """Check if Anthropic API key is available"""
@@ -199,7 +211,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_xai_api_key(self) -> Optional[str]:
-        return self._settings.xai_api_key
+        """Get xAI API key - checks internal settings first, then environment variable"""
+        if self._settings.xai_api_key:
+            return self._settings.xai_api_key
+        # Fallback to environment variable
+        return os.getenv("XAI_API_KEY")
     
     def has_xai_api_key(self) -> bool:
         return bool(self._settings.xai_api_key)
@@ -216,7 +232,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_meta_api_key(self) -> Optional[str]:
-        return self._settings.meta_api_key
+        """Get Meta API key - checks internal settings first, then environment variable"""
+        if self._settings.meta_api_key:
+            return self._settings.meta_api_key
+        # Fallback to environment variable
+        return os.getenv("META_API_KEY")
     
     def has_meta_api_key(self) -> bool:
         return bool(self._settings.meta_api_key)
@@ -233,7 +253,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_mistral_api_key(self) -> Optional[str]:
-        return self._settings.mistral_api_key
+        """Get Mistral API key - checks internal settings first, then environment variable"""
+        if self._settings.mistral_api_key:
+            return self._settings.mistral_api_key
+        # Fallback to environment variable
+        return os.getenv("MISTRAL_API_KEY")
     
     def has_mistral_api_key(self) -> bool:
         return bool(self._settings.mistral_api_key)
@@ -250,7 +274,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_microsoft_api_key(self) -> Optional[str]:
-        return self._settings.microsoft_api_key
+        """Get Microsoft/Azure API key - checks internal settings first, then environment variable"""
+        if self._settings.microsoft_api_key:
+            return self._settings.microsoft_api_key
+        # Fallback to environment variable
+        return os.getenv("AZURE_API_KEY")
     
     def has_microsoft_api_key(self) -> bool:
         return bool(self._settings.microsoft_api_key)
@@ -268,10 +296,18 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_amazon_access_key(self) -> Optional[str]:
-        return self._settings.amazon_access_key
+        """Get Amazon AWS access key - checks internal settings first, then environment variable"""
+        if self._settings.amazon_access_key:
+            return self._settings.amazon_access_key
+        # Fallback to environment variable
+        return os.getenv("AWS_ACCESS_KEY_ID")
     
     def get_amazon_secret_key(self) -> Optional[str]:
-        return self._settings.amazon_secret_key
+        """Get Amazon AWS secret key - checks internal settings first, then environment variable"""
+        if self._settings.amazon_secret_key:
+            return self._settings.amazon_secret_key
+        # Fallback to environment variable
+        return os.getenv("AWS_SECRET_ACCESS_KEY")
     
     def has_amazon_credentials(self) -> bool:
         return bool(self._settings.amazon_access_key and self._settings.amazon_secret_key)
@@ -288,7 +324,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_cohere_api_key(self) -> Optional[str]:
-        return self._settings.cohere_api_key
+        """Get Cohere API key - checks internal settings first, then environment variable"""
+        if self._settings.cohere_api_key:
+            return self._settings.cohere_api_key
+        # Fallback to environment variable
+        return os.getenv("COHERE_API_KEY")
     
     def has_cohere_api_key(self) -> bool:
         return bool(self._settings.cohere_api_key)
@@ -305,7 +345,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_deepseek_api_key(self) -> Optional[str]:
-        return self._settings.deepseek_api_key
+        """Get DeepSeek API key - checks internal settings first, then environment variable"""
+        if self._settings.deepseek_api_key:
+            return self._settings.deepseek_api_key
+        # Fallback to environment variable
+        return os.getenv("DEEPSEEK_API_KEY")
     
     def has_deepseek_api_key(self) -> bool:
         return bool(self._settings.deepseek_api_key)
@@ -322,7 +366,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_together_api_key(self) -> Optional[str]:
-        return self._settings.together_api_key
+        """Get Together API key - checks internal settings first, then environment variable"""
+        if self._settings.together_api_key:
+            return self._settings.together_api_key
+        # Fallback to environment variable
+        return os.getenv("TOGETHER_API_KEY")
     
     def has_together_api_key(self) -> bool:
         return bool(self._settings.together_api_key)
@@ -339,7 +387,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_minimax_api_key(self) -> Optional[str]:
-        return self._settings.minimax_api_key
+        """Get MiniMax API key - checks internal settings first, then environment variable"""
+        if self._settings.minimax_api_key:
+            return self._settings.minimax_api_key
+        # Fallback to environment variable
+        return os.getenv("MINIMAX_API_KEY")
     
     def has_minimax_api_key(self) -> bool:
         return bool(self._settings.minimax_api_key)
@@ -356,7 +408,11 @@ class SettingsManager:
         self._settings.save_api_key = save_key
     
     def get_zhipuai_api_key(self) -> Optional[str]:
-        return self._settings.zhipuai_api_key
+        """Get ZhipuAI API key - checks internal settings first, then environment variable"""
+        if self._settings.zhipuai_api_key:
+            return self._settings.zhipuai_api_key
+        # Fallback to environment variable
+        return os.getenv("ZHIPUAI_API_KEY")
     
     def has_zhipuai_api_key(self) -> bool:
         return bool(self._settings.zhipuai_api_key)
