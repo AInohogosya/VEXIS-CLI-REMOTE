@@ -28,6 +28,7 @@ class ProviderType(Enum):
     TOGETHER = "together"
     MINIMAX = "minimax"
     ZHIPUAI = "zhipuai"
+    OPENROUTER = "openrouter"
 
 
 class ResponseFormat(Enum):
@@ -54,6 +55,7 @@ class GenerationConfig:
     response_format: ResponseFormat = ResponseFormat.TEXT
     system_instruction: Optional[str] = None
     timeout: int = 60
+    model: Optional[str] = None  # Model identifier for providers that need it explicitly
     
     # Provider-specific extensions (passed through as-is)
     extra_params: Dict[str, Any] = field(default_factory=dict)
@@ -364,7 +366,7 @@ def _estimate_cost(provider: str, model: str, prompt_tokens: int, completion_tok
         }
     }
     
-    provider_pricing = pricing.get(provider.lower(), {})
+    provider_pricing = pricing.get(provider.value, {})
     
     # Try exact match first, then prefix match
     if model in provider_pricing:

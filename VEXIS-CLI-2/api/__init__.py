@@ -116,6 +116,11 @@ try:
 except ImportError as e:
     ZhipuAILLMClient = None  # type: ignore
 
+try:
+    from .openrouter_client import OpenRouterLLMClient
+except ImportError as e:
+    OpenRouterLLMClient = None  # type: ignore
+
 
 # Register providers with factory
 if GoogleLLMClient:
@@ -160,6 +165,9 @@ if MiniMaxLLMClient:
 if ZhipuAILLMClient:
     LLMFactory.register(ProviderType.ZHIPUAI, ZhipuAILLMClient)
 
+if OpenRouterLLMClient:
+    LLMFactory.register(ProviderType.OPENROUTER, OpenRouterLLMClient)
+
 
 __all__ = [
     # Base classes
@@ -186,6 +194,7 @@ __all__ = [
     "TogetherLLMClient",
     "MiniMaxLLMClient",
     "ZhipuAILLMClient",
+    "OpenRouterLLMClient",
 ]
 
 
@@ -221,6 +230,7 @@ def create_client(
         "zhipuai": ProviderType.ZHIPUAI,
         "zhipu": ProviderType.ZHIPUAI,
         "glm": ProviderType.ZHIPUAI,
+        "openrouter": ProviderType.OPENROUTER,
     }
     
     return LLMFactory.create(provider_type, api_key=api_key, **kwargs)

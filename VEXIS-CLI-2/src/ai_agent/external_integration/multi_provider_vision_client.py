@@ -56,6 +56,7 @@ class APIProvider(Enum):
         DEEPSEEK = "deepseek"
         GROQ = "groq"
         TOGETHER = "together"
+        OPENROUTER = "openrouter"
 
 
 @dataclass
@@ -133,6 +134,7 @@ class MultiProviderVisionAPIClient:
             'together': (ProviderType.TOGETHER, settings.get_together_api_key),
             'minimax': (ProviderType.MINIMAX, settings.get_minimax_api_key),
             'zhipuai': (ProviderType.ZHIPUAI, settings.get_zhipuai_api_key),
+            'openrouter': (ProviderType.OPENROUTER, settings.get_openrouter_api_key),
         }
         
         for provider_name, (provider_type, api_key_getter) in provider_mappings.items():
@@ -241,7 +243,8 @@ class MultiProviderVisionAPIClient:
             config = GenerationConfig(
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
-                system_instruction=request.system_instruction
+                system_instruction=request.system_instruction,
+                model=request.model
             )
             
             # Handle image data if present
