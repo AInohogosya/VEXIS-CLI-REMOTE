@@ -73,7 +73,7 @@ const SETTINGS_FILE = join(__dirname, 'forwarder_settings.json');
 const VALID_PROVIDERS = [
   'ollama', 'google', 'openai', 'anthropic', 'xai', 'meta', 
   'groq', 'deepseek', 'together', 'microsoft', 'mistral', 
-  'amazon', 'cohere', 'minimax', 'zhipuai'
+  'amazon', 'cohere', 'minimax', 'zhipuai', 'openrouter'
 ];
 
 // API key environment variable mapping for each provider
@@ -91,7 +91,8 @@ const API_KEY_ENV_VARS = {
   'amazon': ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
   'cohere': 'COHERE_API_KEY',
   'minimax': 'MINIMAX_API_KEY',
-  'zhipuai': 'ZHIPUAI_API_KEY'
+  'zhipuai': 'ZHIPUAI_API_KEY',
+  'openrouter': 'OPENROUTER_API_KEY'
 };
 
 // Default settings
