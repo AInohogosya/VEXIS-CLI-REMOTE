@@ -163,36 +163,16 @@ class OpenRouterLLMClient(BaseLLM):
         start_time = time.time()
         
         try:
-            # Prepare messages
-            messages = [{"role": "user", "content": prompt}]
+            # Get system instruction from config
+            system_instruction = config.system_instruction if config else None
             
-            # Handle images for vision models
-            if images and self._supports_vision(config.model or self.default_model):
-                content = []
-                content.append({"type": "text", "text": prompt})
-                
-                for img in images:
-                    if hasattr(img, 'save'):  # PIL Image
-                        import io
-                        img_bytes = io.BytesIO()
-                        img.save(img_bytes, format='PNG')
-                        img_bytes = img_bytes.getvalue()
-                        import base64
-                        img_b64 = base64.b64encode(img_bytes).decode()
-                        content.append({
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{img_b64}"}
-                        })
-                    else:
-                        # Assume bytes
-                        import base64
-                        img_b64 = base64.b64encode(img).decode()
-                        content.append({
-                            "type": "image_url", 
-                            "image_url": {"url": f"data:image/png;base64,{img_b64}"}
-                        })
-                
-                messages[0]["content"] = content
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                images=images,
+                model=config.model if config else None
+            )
             
             # Prepare generation parameters
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
@@ -280,9 +260,15 @@ class OpenRouterLLMClient(BaseLLM):
         config = config or GenerationConfig()
         
         try:
-            # Prepare generation parameters
-            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
-                model = config.extra_params['model']
+            # Get system instruction from config
+            system_instruction = config.system_instruction if config else None
+            
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                model=config.model if config else None
+            )
             
             model = config.model or self.default_model
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
@@ -290,7 +276,7 @@ class OpenRouterLLMClient(BaseLLM):
             
             generation_params = {
                 "model": model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "max_tokens": config.max_tokens,
                 "temperature": config.temperature,
                 "stream": True,
@@ -329,34 +315,16 @@ class OpenRouterLLMClient(BaseLLM):
         start_time = time.time()
         
         try:
-            # Prepare messages (same logic as generate())
-            messages = [{"role": "user", "content": prompt}]
+            # Get system instruction from config
+            system_instruction = config.system_instruction if config else None
             
-            if images and self._supports_vision(config.model or self.default_model):
-                content = []
-                content.append({"type": "text", "text": prompt})
-                
-                for img in images:
-                    if hasattr(img, 'save'):
-                        import io
-                        img_bytes = io.BytesIO()
-                        img.save(img_bytes, format='PNG')
-                        img_bytes = img_bytes.getvalue()
-                        import base64
-                        img_b64 = base64.b64encode(img_bytes).decode()
-                        content.append({
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{img_b64}"}
-                        })
-                    else:
-                        import base64
-                        img_b64 = base64.b64encode(img).decode()
-                        content.append({
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{img_b64}"}
-                        })
-                
-                messages[0]["content"] = content
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                images=images,
+                model=config.model if config else None
+            )
             
             # Prepare generation parameters
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
@@ -432,8 +400,15 @@ class OpenRouterLLMClient(BaseLLM):
         config = config or GenerationConfig()
         
         try:
-            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
-                model = config.extra_params['model']
+            # Get system instruction from config
+            system_instruction = config.system_instruction if config else None
+            
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                model=config.model if config else None
+            )
             
             model = config.model or self.default_model
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
@@ -441,7 +416,7 @@ class OpenRouterLLMClient(BaseLLM):
             
             generation_params = {
                 "model": model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "max_tokens": config.max_tokens,
                 "temperature": config.temperature,
                 "stream": True,
@@ -534,6 +509,54 @@ class OpenRouterLLMClient(BaseLLM):
     def _supports_vision(self, model: str) -> bool:
         """Check if model supports vision"""
         return model in self.VISION_MODELS
+
+    def _build_messages(
+        self,
+        prompt: str,
+        system_instruction: Optional[str] = None,
+        images: Optional[List[Any]] = None,
+        model: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Build messages array with optional system instruction and images"""
+        messages = []
+
+        # Add system message if provided
+        if system_instruction:
+            messages.append({
+                "role": "system",
+                "content": system_instruction
+            })
+
+        # Build user message
+        if images and self._supports_vision(model or self.default_model):
+            content = [{"type": "text", "text": prompt}]
+
+            for img in images:
+                if hasattr(img, 'save'):  # PIL Image
+                    import io
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format='PNG')
+                    img_bytes = img_bytes.getvalue()
+                    import base64
+                    img_b64 = base64.b64encode(img_bytes).decode()
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_b64}"}
+                    })
+                else:
+                    # Assume bytes
+                    import base64
+                    img_b64 = base64.b64encode(img).decode()
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_b64}"}
+                    })
+
+            messages.append({"role": "user", "content": content})
+        else:
+            messages.append({"role": "user", "content": prompt})
+
+        return messages
 
     def count_tokens(self, text: str, model: Optional[str] = None) -> int:
         """
