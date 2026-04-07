@@ -162,8 +162,8 @@ class OpenAILLMClient(BaseLLM):
         """
         messages = []
         
-        # Add system message if provided (not for reasoning models)
-        if system_instruction and not self._is_reasoning_model(kwargs.get("model", "")):
+        # Add system message if provided
+        if system_instruction:
             messages.append({
                 "role": "system",
                 "content": system_instruction
@@ -215,18 +215,12 @@ class OpenAILLMClient(BaseLLM):
         if config is None:
             return params
         
-        is_reasoning = self._is_reasoning_model(model)
-        
-        # Handle max_tokens vs max_completion_tokens
+        # Handle max_tokens
         if config.max_tokens is not None:
-            if is_reasoning:
-                # Reasoning models use max_completion_tokens
-                params["max_completion_tokens"] = config.max_tokens
-            else:
-                params["max_tokens"] = config.max_tokens
+            params["max_tokens"] = config.max_tokens
         
-        # Temperature (not supported by reasoning models)
-        if not is_reasoning and config.temperature is not None:
+        # Temperature
+        if config.temperature is not None:
             params["temperature"] = config.temperature
         
         # Top P

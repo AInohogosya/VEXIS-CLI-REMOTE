@@ -250,18 +250,6 @@ class ModelRunner:
 
         try:
             formatted_prompt = template.format(**format_vars)
-            
-            # Add system instructions for better AI behavior
-            system_instructions = self._get_system_instructions(request.task_type)
-            if system_instructions:
-                # For providers that support system instructions, we'll set them in the config
-                # For others, we prepend to the prompt
-                if hasattr(request, 'parameters') and request.parameters:
-                    request.parameters['system_instruction'] = system_instructions
-                else:
-                    # Prepend system instructions to prompt for providers that don't support separate system messages
-                    formatted_prompt = f"{system_instructions}\n\n{formatted_prompt}"
-            
             return formatted_prompt
         except KeyError as e:
             self.logger.warning(f"Template variable missing: {e}")

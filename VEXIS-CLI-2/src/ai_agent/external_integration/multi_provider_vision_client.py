@@ -202,18 +202,13 @@ class MultiProviderVisionAPIClient:
     def _handle_ollama_request(self, request: APIRequest, start_time: float) -> APIResponse:
         """Handle Ollama requests"""
         try:
-            # Prepare prompt with system instructions for Ollama
-            prompt_with_system = request.prompt
-            if request.system_instruction:
-                # Prepend system instructions for Ollama since it may not support separate system messages
-                prompt_with_system = f"{request.system_instruction}\n\n{request.prompt}"
-            
-            # Use existing Ollama provider logic
+            # Use existing Ollama provider logic with system instruction support
             ollama_response = self.ollama_provider.chat(
-                prompt=prompt_with_system,
+                prompt=request.prompt,
                 model=request.model,
                 temperature=request.temperature,
-                max_tokens=request.max_tokens
+                max_tokens=request.max_tokens,
+                system_instruction=request.system_instruction
             )
             
             return APIResponse(

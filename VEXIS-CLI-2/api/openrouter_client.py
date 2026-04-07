@@ -471,7 +471,7 @@ class OpenRouterLLMClient(BaseLLM):
                 ModelInfo(
                     id="google/gemini-flash-1.5:free",
                     name="Google Gemini Flash 1.5 (Free)",
-                    description="Free Gemini model via OpenRouter",
+                    description="Free Gemini model",
                     context_length=1_048_576,
                     max_tokens=8_192,
                     vision_support=True
@@ -479,7 +479,7 @@ class OpenRouterLLMClient(BaseLLM):
                 ModelInfo(
                     id="qwen/qwen3.6-plus:free",
                     name="Qwen 3.6 Plus (Free)",
-                    description="Free Qwen model via OpenRouter",
+                    description="Free Qwen model",
                     context_length=32_768,
                     max_tokens=32_768,
                     vision_support=False
