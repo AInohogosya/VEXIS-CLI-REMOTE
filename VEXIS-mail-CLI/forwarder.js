@@ -141,14 +141,14 @@ let isProcessing = false;
 const messageQueue = [];
 
 // Dialogue history management
-// Structure: [{ role: "user"|"assistant", content: string, terminalLog?: string, phase5Output?: string, timestamp: number }]
+// Structure: [{ role: "user"|"assistant", content: string, terminalLog?: string, phase4Output?: string, timestamp: number }]
 let dialogueHistory = [];
 
 /**
  * Add entry to dialogue history
  * @param {string} role - "user" or "assistant"
  * @param {string} content - The message content
- * @param {object} metadata - Additional metadata (terminalLog, phase5Output)
+ * @param {object} metadata - Additional metadata (terminalLog, phase4Output)
  */
 function addToHistory(role, content, metadata = {}) {
   const entry = {
@@ -340,29 +340,29 @@ async function sendResponse(uid, content) {
 }
 
 /**
- * Extract terminal log and phase 5 output from CLI response
+ * Extract terminal log and phase 4 output from CLI response
  * @param {string} output - Full CLI output
- * @returns {object} - { terminalLog, phase5Output, summary }
+ * @returns {object} - { terminalLog, phase4Output, summary }
  */
 function extractExecutionData(output) {
   let terminalLog = '';
-  let phase5Output = '';
+  let phase4Output = '';
   let summary = '';
 
-  // Extract terminal log section
-  const terminalMatch = output.match(/TERMINAL_LOG_START\n([\s\S]*?)\nTERMINAL_LOG_END/);
+  // Extract terminal log section (match with \n before START and after END)
+  const terminalMatch = output.match(/\nTERMINAL_LOG_START\n([\s\S]*?)\nTERMINAL_LOG_END/);
   if (terminalMatch) {
     terminalLog = terminalMatch[1].trim();
   }
 
-  // Extract phase 5 output section
-  const phase5Match = output.match(/PHASE5_OUTPUT_START\n([\s\S]*?)\nPHASE5_OUTPUT_END/);
-  if (phase5Match) {
-    phase5Output = phase5Match[1].trim();
+  // Extract phase 4 output section (log evaluation) (match with \n before START and after END)
+  const phase4Match = output.match(/\nPHASE4_OUTPUT_START\n([\s\S]*?)\nPHASE4_OUTPUT_END/);
+  if (phase4Match) {
+    phase4Output = phase4Match[1].trim();
   }
 
-  // Extract final summary (the main response)
-  const summaryMatch = output.match(/FINAL_SUMMARY_START\n([\s\S]*?)\nFINAL_SUMMARY_END/);
+  // Extract final summary (the main response) (match with \n before START and after END)
+  const summaryMatch = output.match(/\nFINAL_SUMMARY_START\n([\s\S]*?)\nFINAL_SUMMARY_END/);
   if (summaryMatch) {
     summary = summaryMatch[1].trim();
   }
@@ -372,7 +372,7 @@ function extractExecutionData(output) {
     summary = extractResponse(output);
   }
 
-  return { terminalLog, phase5Output, summary };
+  return { terminalLog, phase4Output, summary };
 }
 
 /**
@@ -415,12 +415,12 @@ async function processMessage(messageData, uid) {
     const response = await executeVEXISCLI2(content);
 
     // Extract structured data from response
-    const { terminalLog, phase5Output, summary } = extractExecutionData(response);
+    const { terminalLog, phase4Output, summary } = extractExecutionData(response);
 
     // Add assistant response to history with metadata
     addToHistory('assistant', summary || response, {
       terminalLog: terminalLog || '',
-      phase5Output: phase5Output || ''
+      phase4Output: phase4Output || ''
     });
 
     if (summary || response) {

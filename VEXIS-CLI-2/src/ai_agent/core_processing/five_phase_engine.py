@@ -619,10 +619,10 @@ class FivePhaseEngine:
                 if terminal_log:
                     formatted_parts.append(f"[Terminal Log]:\n{terminal_log[:500]}...")  # Truncate for brevity
 
-                # Include phase 5 output if available
-                phase5_output = entry.get('phase5Output', '')
-                if phase5_output:
-                    formatted_parts.append(f"[Phase 5 Analysis]:\n{phase5_output[:500]}...")
+                # Include phase 4 output (log evaluation) if available
+                phase4_output = entry.get('phase4Output', '')
+                if phase4_output:
+                    formatted_parts.append(f"[Phase 4 Evaluation]:\n{phase4_output[:500]}...")
 
             formatted_parts.append("---")
 

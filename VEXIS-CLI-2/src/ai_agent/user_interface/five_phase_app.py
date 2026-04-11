@@ -127,10 +127,10 @@ class FivePhaseAIAgent:
         print(context.terminal_log if context.terminal_log else "")
         print("TERMINAL_LOG_END")
 
-        # Output phase 5 output with markers
-        print("\nPHASE5_OUTPUT_START")
+        # Output phase 4 output (log evaluation) with markers
+        print("\nPHASE4_OUTPUT_START")
         print(context.phase4_output if context.phase4_output else "")
-        print("PHASE5_OUTPUT_END")
+        print("PHASE4_OUTPUT_END")
 
         # Output final summary with markers
         print("\nFINAL_SUMMARY_START")
