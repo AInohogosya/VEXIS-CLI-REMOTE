@@ -46,32 +46,40 @@ class FivePhaseAIAgent:
                 instruction=instruction,
                 options=options,
             )
-            
+
             # Setup logging if requested
             if options.get("verbose"):
                 setup_logging(level="DEBUG")
             elif options.get("log_file"):
                 setup_logging(file_path=options["log_file"])
-            
+
             # Validate instruction
             if not instruction or not instruction.strip():
                 self.logger.error("Instruction cannot be empty")
                 return 1
-            
-            # Execute instruction using 5-phase engine
-            context = self.engine.execute_instruction(instruction)
-            
+
+            # Get dialogue history from options (passed by forwarder.js)
+            dialogue_history = options.get("dialogue_history", [])
+            if dialogue_history:
+                self.logger.info(f"Received dialogue history: {len(dialogue_history)} entries")
+
+            # Execute instruction using 5-phase engine with dialogue history
+            context = self.engine.execute_instruction(instruction, dialogue_history=dialogue_history)
+
             # Determine success based on final phase
             success = context.current_phase == PipelinePhase.COMPLETED
-            
+
             # Print results if not quiet mode
             if not options.get("quiet"):
                 self._print_results(context, instruction, success)
-            
+
+            # Output structured data for forwarder to capture
+            self._output_structured_data(context)
+
             # Save results if requested
             if options.get("output"):
                 self._save_results(context, options["output"])
-            
+
             # Return exit code based on success
             return 0 if success else 1
                 
@@ -111,7 +119,24 @@ class FivePhaseAIAgent:
             print(context.final_summary)
         
         print(f"{'='*60}")
-    
+
+    def _output_structured_data(self, context):
+        """Output structured data with markers for forwarder to capture"""
+        # Output terminal log with markers
+        print("\nTERMINAL_LOG_START")
+        print(context.terminal_log if context.terminal_log else "")
+        print("TERMINAL_LOG_END")
+
+        # Output phase 5 output with markers
+        print("\nPHASE5_OUTPUT_START")
+        print(context.phase4_output if context.phase4_output else "")
+        print("PHASE5_OUTPUT_END")
+
+        # Output final summary with markers
+        print("\nFINAL_SUMMARY_START")
+        print(context.final_summary if context.final_summary else "")
+        print("FINAL_SUMMARY_END")
+
     def _save_results(self, context, output_file: str):
         """Save execution results to file"""
         try:

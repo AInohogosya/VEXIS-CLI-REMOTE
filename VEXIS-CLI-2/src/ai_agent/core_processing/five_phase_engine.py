@@ -80,23 +80,24 @@ class FivePhaseEngine:
         
         self.logger.info("5-Phase Pipeline Engine initialized")
     
-    def execute_instruction(self, user_prompt: str) -> PipelineContext:
+    def execute_instruction(self, user_prompt: str, dialogue_history: Optional[List[Dict[str, Any]]] = None) -> PipelineContext:
         """
         Execute user instruction through the 5-phase pipeline
-        
+
         Args:
             user_prompt: Natural language instruction from user
-            
+            dialogue_history: Optional list of previous dialogue entries for context
+
         Returns:
             PipelineContext with complete execution results
         """
         self.logger.info("Starting 5-Phase Pipeline execution", user_prompt=user_prompt)
-        
+
         # Initialize context
         context = PipelineContext(
             user_prompt=user_prompt,
             max_iterations=self.max_iterations,
-            metadata={"os_info": self._get_os_info()}
+            metadata={"os_info": self._get_os_info(), "dialogue_history": dialogue_history or []}
         )
         
         try:
@@ -162,27 +163,38 @@ class FivePhaseEngine:
     def _run_phase1(self, context: PipelineContext) -> bool:
         """
         Phase 1: Command Suggestion
-        
+
         Send user prompt to base model with system prompt to get natural-language
-        description of what commands should be run.
-        
+        description of what commands should be run. Includes dialogue history for context.
+
         Returns:
             True if successful, False otherwise
         """
         self.logger.info("Phase 1: Command Suggestion started")
         context.current_phase = PipelinePhase.PHASE1_COMMAND_SUGGESTION
-        
+
         try:
             os_info = context.metadata.get("os_info", self._get_os_info())
-            
+            dialogue_history = context.metadata.get("dialogue_history", [])
+
+            # Build context for Phase 1 including dialogue history
+            phase1_context = {
+                "user_prompt": context.user_prompt,
+                "os_info": os_info,
+            }
+
+            # Include dialogue history in Phase 1 only
+            if dialogue_history:
+                # Format dialogue history for the model
+                formatted_history = self._format_dialogue_history(dialogue_history)
+                phase1_context["dialogue_history"] = formatted_history
+                self.logger.info(f"Phase 1: Including {len(dialogue_history)} dialogue history entries")
+
             # Create request for Phase 1
             request = ModelRequest(
                 task_type=TaskType.PHASE1_COMMAND_SUGGESTION,
                 prompt=context.user_prompt,
-                context={
-                    "user_prompt": context.user_prompt,
-                    "os_info": os_info,
-                },
+                context=phase1_context,
                 max_tokens=4000,
                 temperature=0.7
             )
@@ -564,12 +576,61 @@ class FivePhaseEngine:
             
             if system in ["Linux", "Darwin"]:
                 os_info += f" (Shell: {shell})"
-            
+
             return os_info
-            
+
         except Exception as e:
             self.logger.warning(f"Failed to get OS info: {e}")
             return "Unknown OS"
+
+    def _format_dialogue_history(self, dialogue_history: List[Dict[str, Any]]) -> str:
+        """
+        Format dialogue history for inclusion in Phase 1 context.
+
+        Args:
+            dialogue_history: List of dialogue entries
+
+        Returns:
+            Formatted string of dialogue history
+        """
+        if not dialogue_history:
+            return ""
+
+        formatted_parts = ["\n=== Previous Conversation History ===\n"]
+
+        for entry in dialogue_history:
+            role = entry.get('role', 'unknown')
+            content = entry.get('content', '')
+            timestamp = entry.get('timestamp', 0)
+
+            # Format timestamp if available
+            time_str = ''
+            if timestamp:
+                from datetime import datetime
+                time_str = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+            if role == 'user':
+                formatted_parts.append(f"[User {time_str}]: {content}")
+            elif role == 'assistant':
+                formatted_parts.append(f"[Assistant {time_str}]: {content}")
+
+                # Include terminal log if available
+                terminal_log = entry.get('terminalLog', '')
+                if terminal_log:
+                    formatted_parts.append(f"[Terminal Log]:\n{terminal_log[:500]}...")  # Truncate for brevity
+
+                # Include phase 5 output if available
+                phase5_output = entry.get('phase5Output', '')
+                if phase5_output:
+                    formatted_parts.append(f"[Phase 5 Analysis]:\n{phase5_output[:500]}...")
+
+            formatted_parts.append("---")
+
+        formatted_parts.append("=== End of History ===\n")
+        formatted_parts.append("Current working directory and terminal state have been preserved from the previous session.")
+        formatted_parts.append("Please continue from where we left off, maintaining the same terminal context.\n")
+
+        return "\n".join(formatted_parts)
 
 
 def get_five_phase_engine(config: Optional[Dict[str, Any]] = None) -> FivePhaseEngine:

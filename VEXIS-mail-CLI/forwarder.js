@@ -140,6 +140,44 @@ const processedMessageIds = new Set();
 let isProcessing = false;
 const messageQueue = [];
 
+// Dialogue history management
+// Structure: [{ role: "user"|"assistant", content: string, terminalLog?: string, phase5Output?: string, timestamp: number }]
+let dialogueHistory = [];
+
+/**
+ * Add entry to dialogue history
+ * @param {string} role - "user" or "assistant"
+ * @param {string} content - The message content
+ * @param {object} metadata - Additional metadata (terminalLog, phase5Output)
+ */
+function addToHistory(role, content, metadata = {}) {
+  const entry = {
+    role,
+    content,
+    timestamp: Date.now(),
+    ...metadata
+  };
+  dialogueHistory.push(entry);
+  console.log(`[Forwarder] Added to history: role=${role}, history size=${dialogueHistory.length}`);
+}
+
+/**
+ * Reset dialogue history
+ */
+function resetHistory() {
+  const previousSize = dialogueHistory.length;
+  dialogueHistory = [];
+  console.log(`[Forwarder] Dialogue history reset (cleared ${previousSize} entries)`);
+}
+
+/**
+ * Get dialogue history formatted for CLI
+ * @returns {string} - JSON string of history
+ */
+function getHistoryForCLI() {
+  return JSON.stringify(dialogueHistory);
+}
+
 /**
  * Execute VEXIS-CLI-2 with the given instruction
  * @param {string} instruction - The user's instruction
@@ -149,15 +187,16 @@ function executeVEXISCLI2(instruction) {
   return new Promise((resolve, reject) => {
     console.log(`\n[Forwarder] Executing: ${instruction}`);
     console.log(`[Forwarder] Provider: ${settings.provider}, Model: ${settings.model}`);
-    
+    console.log(`[Forwarder] Dialogue history entries: ${dialogueHistory.length}`);
+
     const args = [
-      VEXIS_CLI_2_PATH, 
-      instruction, 
+      VEXIS_CLI_2_PATH,
+      instruction,
       '--no-prompt',
       '--provider', settings.provider,
       '--model', settings.model
     ];
-    
+
     // Prepare environment with API keys for non-Ollama providers
     const env = { ...process.env };
     if (settings.provider !== 'ollama' && settings.apiKeys) {
@@ -180,7 +219,11 @@ function executeVEXISCLI2(instruction) {
         }
       }
     }
-    
+
+    // Pass dialogue history to CLI via environment variable
+    env['VEXIS_DIALOGUE_HISTORY'] = getHistoryForCLI();
+    console.log(`[Forwarder] Dialogue history passed to CLI (${dialogueHistory.length} entries)`);
+
     const pythonProcess = spawn('python3', args, {
       cwd: dirname(VEXIS_CLI_2_PATH),
       env: env
@@ -297,6 +340,42 @@ async function sendResponse(uid, content) {
 }
 
 /**
+ * Extract terminal log and phase 5 output from CLI response
+ * @param {string} output - Full CLI output
+ * @returns {object} - { terminalLog, phase5Output, summary }
+ */
+function extractExecutionData(output) {
+  let terminalLog = '';
+  let phase5Output = '';
+  let summary = '';
+
+  // Extract terminal log section
+  const terminalMatch = output.match(/TERMINAL_LOG_START\n([\s\S]*?)\nTERMINAL_LOG_END/);
+  if (terminalMatch) {
+    terminalLog = terminalMatch[1].trim();
+  }
+
+  // Extract phase 5 output section
+  const phase5Match = output.match(/PHASE5_OUTPUT_START\n([\s\S]*?)\nPHASE5_OUTPUT_END/);
+  if (phase5Match) {
+    phase5Output = phase5Match[1].trim();
+  }
+
+  // Extract final summary (the main response)
+  const summaryMatch = output.match(/FINAL_SUMMARY_START\n([\s\S]*?)\nFINAL_SUMMARY_END/);
+  if (summaryMatch) {
+    summary = summaryMatch[1].trim();
+  }
+
+  // If no markers found, use the old extraction method
+  if (!summary) {
+    summary = extractResponse(output);
+  }
+
+  return { terminalLog, phase5Output, summary };
+}
+
+/**
  * Process a single message
  * @param {object} messageData - The message data
  * @param {string} uid - The user's UID
@@ -307,27 +386,57 @@ async function processMessage(messageData, uid) {
     messageQueue.push({ messageData, uid });
     return;
   }
-  
+
   isProcessing = true;
-  
+
   try {
-    console.log(`\n[Forwarder] Processing: "${messageData.content.substring(0, 50)}..."`);
-    
-    const response = await executeVEXISCLI2(messageData.content);
-    
-    if (response) {
-      await sendResponse(uid, response);
+    const content = messageData.content;
+    console.log(`\n[Forwarder] Processing: "${content.substring(0, 50)}..."`);
+
+    // Check for /reset command
+    if (content.trim() === '/reset') {
+      console.log(`[Forwarder] Received /reset command`);
+      resetHistory();
+      await sendResponse(uid, "🔄 Dialogue history has been reset. Starting fresh conversation.");
+      console.log(`[Forwarder] ✓ Reset completed`);
+      isProcessing = false;
+
+      // Process next message in queue
+      if (messageQueue.length > 0) {
+        const next = messageQueue.shift();
+        processMessage(next.messageData, next.uid);
+      }
+      return;
+    }
+
+    // Add user message to history
+    addToHistory('user', content);
+
+    const response = await executeVEXISCLI2(content);
+
+    // Extract structured data from response
+    const { terminalLog, phase5Output, summary } = extractExecutionData(response);
+
+    // Add assistant response to history with metadata
+    addToHistory('assistant', summary || response, {
+      terminalLog: terminalLog || '',
+      phase5Output: phase5Output || ''
+    });
+
+    if (summary || response) {
+      await sendResponse(uid, summary || response);
     } else {
       await sendResponse(uid, "Task completed. (No text output)");
     }
-    
+
     console.log(`[Forwarder] ✓ Message processed successfully`);
+    console.log(`[Forwarder] History size: ${dialogueHistory.length} entries`);
   } catch (error) {
     console.error(`[Forwarder] ✗ Error processing message:`, error.message);
     await sendResponse(uid, `Error: ${error.message}`);
   } finally {
     isProcessing = false;
-    
+
     // Process next message in queue
     if (messageQueue.length > 0) {
       const next = messageQueue.shift();
@@ -463,9 +572,13 @@ async function main() {
         console.log(`[Forwarder] User: ${auth.currentUser?.email}`);
         console.log(`[Forwarder] Messages processed: ${processedMessageIds.size}`);
         console.log(`[Forwarder] Queue length: ${messageQueue.length}`);
+        console.log(`[Forwarder] Dialogue history: ${dialogueHistory.length} entries`);
       } else {
         console.log(`[Forwarder] Status: Not logged in`);
       }
+    } else if (input.trim().toLowerCase() === '/reset') {
+      resetHistory();
+      console.log('[Forwarder] ✓ Dialogue history reset\n');
     } else if (input.trim().toLowerCase() === '/setting') {
       console.log('\n[Forwarder] === Provider & Model Settings ===');
       console.log(`[Forwarder] Current: provider=${settings.provider}, model=${settings.model}`);
@@ -547,6 +660,7 @@ async function main() {
       console.log('  /login   - Login to your account');
       console.log('  /setting - Configure provider and model');
       console.log('  /status  - Show service status');
+      console.log('  /reset   - Reset dialogue history');
       console.log('  /help    - Show this help message');
       console.log('  /exit    - Stop the service');
       console.log('');

@@ -1777,7 +1777,18 @@ def main():
     
     try:
         from ai_agent.user_interface.five_phase_app import FivePhaseAIAgent
-        
+
+        # Read dialogue history from environment variable (set by forwarder.js)
+        import json
+        dialogue_history_json = os.environ.get('VEXIS_DIALOGUE_HISTORY', '[]')
+        try:
+            dialogue_history = json.loads(dialogue_history_json)
+            if dialogue_history:
+                print(f"[Run] Loaded dialogue history: {len(dialogue_history)} entries")
+        except json.JSONDecodeError:
+            dialogue_history = []
+            print("[Run] Warning: Could not parse dialogue history")
+
         # Create agent with selected provider and model
         config_path = current_dir / "config.yaml"
         agent = FivePhaseAIAgent(
@@ -1785,16 +1796,17 @@ def main():
             model=selected_model,
             config_path=str(config_path) if config_path.exists() else None
         )
-        
+
         # Run the instruction with 5-phase options
         options = {
             "debug": debug_mode,
             "max_iterations": max_iterations,
             "command_timeout": 30,
-            "task_timeout": 300
+            "task_timeout": 300,
+            "dialogue_history": dialogue_history
         }
         result = agent.run(instruction, options)
-        
+
         if result == 0:
             print("\n✓ Task completed successfully")
         else:
