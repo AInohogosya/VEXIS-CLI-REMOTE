@@ -13,7 +13,10 @@ Environment Variables:
 
 import os
 import time
+import json
 from typing import Optional, Dict, Any, List, Iterator, AsyncIterator
+from datetime import datetime
+from pathlib import Path
 
 from .base import (
     BaseLLM, ProviderType, GenerationConfig, LLMResponse,
@@ -137,6 +140,33 @@ class OpenRouterLLMClient(BaseLLM):
         self._client = OpenAI(**client_kwargs)
         self._async_client = AsyncOpenAI(**client_kwargs)
 
+    def _log_prompt(self, prompt: str, system_instruction: Optional[str], model: str, method: str = "generate") -> None:
+        """Log prompt to JSON file for debugging"""
+        try:
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "method": method,
+                "model": model,
+                "provider": "openrouter",
+                "system_instruction": system_instruction,
+                "user_prompt": prompt,
+            }
+            
+            # Create logs directory if it doesn't exist
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True)
+            
+            # Log file path
+            log_file = log_dir / "openrouter_prompts.json"
+            
+            # Append to log file
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                
+        except Exception as e:
+            # Don't fail if logging fails
+            pass
+
     def generate(
         self,
         prompt: str,
@@ -166,14 +196,6 @@ class OpenRouterLLMClient(BaseLLM):
             # Get system instruction from config
             system_instruction = config.system_instruction if config else None
             
-            # Prepare messages using helper method
-            messages = self._build_messages(
-                prompt=prompt,
-                system_instruction=system_instruction,
-                images=images,
-                model=config.model if config else None
-            )
-            
             # Prepare generation parameters
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
                 model = config.extra_params['model']
@@ -181,6 +203,17 @@ class OpenRouterLLMClient(BaseLLM):
             model = config.model or self.default_model
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
                 model = config.extra_params['model']
+            
+            # Log the prompt
+            self._log_prompt(prompt, system_instruction, model, method="generate")
+            
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                images=images,
+                model=model
+            )
             
             generation_params = {
                 "model": model,
@@ -263,16 +296,19 @@ class OpenRouterLLMClient(BaseLLM):
             # Get system instruction from config
             system_instruction = config.system_instruction if config else None
             
+            model = config.model or self.default_model
+            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
+                model = config.extra_params['model']
+            
+            # Log the prompt
+            self._log_prompt(prompt, system_instruction, model, method="generate_stream")
+            
             # Prepare messages using helper method
             messages = self._build_messages(
                 prompt=prompt,
                 system_instruction=system_instruction,
-                model=config.model if config else None
+                model=model
             )
-            
-            model = config.model or self.default_model
-            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
-                model = config.extra_params['model']
             
             generation_params = {
                 "model": model,
@@ -318,14 +354,6 @@ class OpenRouterLLMClient(BaseLLM):
             # Get system instruction from config
             system_instruction = config.system_instruction if config else None
             
-            # Prepare messages using helper method
-            messages = self._build_messages(
-                prompt=prompt,
-                system_instruction=system_instruction,
-                images=images,
-                model=config.model if config else None
-            )
-            
             # Prepare generation parameters
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
                 model = config.extra_params['model']
@@ -333,6 +361,17 @@ class OpenRouterLLMClient(BaseLLM):
             model = config.model or self.default_model
             if hasattr(config, 'extra_params') and 'model' in config.extra_params:
                 model = config.extra_params['model']
+            
+            # Log the prompt
+            self._log_prompt(prompt, system_instruction, model, method="generate_async")
+            
+            # Prepare messages using helper method
+            messages = self._build_messages(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                images=images,
+                model=model
+            )
             
             generation_params = {
                 "model": model,
@@ -403,16 +442,19 @@ class OpenRouterLLMClient(BaseLLM):
             # Get system instruction from config
             system_instruction = config.system_instruction if config else None
             
+            model = config.model or self.default_model
+            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
+                model = config.extra_params['model']
+            
+            # Log the prompt
+            self._log_prompt(prompt, system_instruction, model, method="generate_stream_async")
+            
             # Prepare messages using helper method
             messages = self._build_messages(
                 prompt=prompt,
                 system_instruction=system_instruction,
-                model=config.model if config else None
+                model=model
             )
-            
-            model = config.model or self.default_model
-            if hasattr(config, 'extra_params') and 'model' in config.extra_params:
-                model = config.extra_params['model']
             
             generation_params = {
                 "model": model,

@@ -1677,8 +1677,22 @@ def main():
         print("  python3 manage_sdks.py install google  # Install specific SDK")
         sys.exit(0)
     
-    # Filter out flags to get the actual instruction
-    instruction_args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    # Filter out flags and their values to get the actual instruction
+    # Flags like --provider and --model have values that should not be part of the instruction
+    flags_to_skip = ["--provider", "--model", "--max-iterations"]
+    instruction_args = []
+    i = 0
+    while i < len(sys.argv[1:]):
+        arg = sys.argv[1:][i]
+        if arg.startswith("--"):
+            # Skip this flag and its value
+            if arg in flags_to_skip:
+                i += 2  # Skip flag and its value
+            else:
+                i += 1  # Skip flag without value
+        else:
+            instruction_args.append(arg)
+            i += 1
     instruction = " ".join(instruction_args)
     
     # Allow SDK management commands without instruction
