@@ -12,13 +12,13 @@
  * 3. Sends the AI response back to Firebase
  */
 
-import { initializeApp } from 'firebase/app';
-import { 
+const { initializeApp } = require('firebase/app');
+const { 
   getAuth, 
   signInWithEmailAndPassword,
   onAuthStateChanged
-} from 'firebase/auth';
-import { 
+} = require('firebase/auth');
+const { 
   getFirestore, 
   collection, 
   query, 
@@ -28,15 +28,13 @@ import {
   doc,
   updateDoc,
   addDoc
-} from 'firebase/firestore';
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import * as readline from 'readline';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+} = require('firebase/firestore');
+const { spawn } = require('child_process');
+const path = require('path');
+const readline = require('readline');
+const fs = require('fs');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 // Firebase config
 const firebaseConfig = {
@@ -64,10 +62,10 @@ function question(prompt) {
 }
 
 // Path to VEXIS-CLI-2
-const VEXIS_CLI_2_PATH = join(__dirname, '..', 'VEXIS-CLI-2', 'run.py');
+const VEXIS_CLI_2_PATH = path.join(__dirname, '..', 'VEXIS-CLI-2', 'run.py');
 
 // Settings file path
-const SETTINGS_FILE = join(__dirname, 'forwarder_settings.json');
+const SETTINGS_FILE = path.join(__dirname, 'forwarder_settings.json');
 
 // Valid providers list
 const VALID_PROVIDERS = [
