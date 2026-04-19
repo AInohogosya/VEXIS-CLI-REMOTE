@@ -1,0 +1,96 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Configuration (may contain sensitive data)
+config.yaml
+*.secret
+*.key
+
+# Terminal history (may contain sensitive data)
+terminal_history/
+session_*.json
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.tox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# Linting
+.pyre/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Test instructions (temporary)
+test_instruction/
+
+# Root-level test files (temporary)
+test_*.py
+!tests/**/*.py
+
+# Node modules (if using JS)
+node_modules/
+
+# Package managers
+yarn.lock
+package-lock.json
+
+# Docker
+docker/.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
