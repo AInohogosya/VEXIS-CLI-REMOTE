@@ -26,7 +26,7 @@ class SimpleOllamaProvider:
     """
 
     # Valid Ollama models (local or cloud)
-    DEFAULT_MODEL = "llama4-scout-17b"
+    DEFAULT_MODEL = "gpt-oss:20b-cloud"
 
     def __init__(self, endpoint: str = "http://localhost:11434", timeout: int = 120):
         self.endpoint = endpoint.rstrip("/")

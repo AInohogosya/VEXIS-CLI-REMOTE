@@ -17,7 +17,7 @@ def _get_ollama_model_from_settings() -> str:
     try:
         # Try to load from config.yaml first
         from pathlib import Path
-        config_path = Path(__file__).parent.parent.parent / "config.yaml"
+        config_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
         if config_path.exists():
             import yaml
             with open(config_path, 'r') as f:
@@ -32,9 +32,9 @@ def _get_ollama_model_from_settings() -> str:
         from .settings_manager import get_settings_manager
         settings = get_settings_manager()
         model = settings.get_ollama_model()
-        return model if model else "llama4-scout-17b"
+        return model if model else "gpt-oss:20b-cloud"
     except Exception:
-        return "llama4-scout-17b"
+        return "gpt-oss:20b-cloud"
 
 
 @dataclass

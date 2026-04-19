@@ -83,7 +83,7 @@ class ModelRunner:
         """Get default Ollama model from config.yaml"""
         try:
             from pathlib import Path
-            config_path = Path(__file__).parent.parent.parent / "config.yaml"
+            config_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
             if config_path.exists():
                 import yaml
                 with open(config_path, 'r') as f:
@@ -92,9 +92,9 @@ class ModelRunner:
                         return config['api']['local_model']
         except Exception:
             pass
-        return "llama3.2:latest"
-    
-    DEFAULT_OLLAMA_MODEL = "llama3.2:latest"  # Fallback, use get_default_ollama_model() for config value
+        return "gpt-oss:20b-cloud"
+
+    DEFAULT_OLLAMA_MODEL = "gpt-oss:20b-cloud"  # Fallback, use get_default_ollama_model() for config value
     DEFAULT_GOOGLE_MODEL = "gemini-3.1-pro-preview"
 
     def __init__(self, provider: str = None, model: str = None, config: Optional[Dict[str, Any]] = None, auto_install_sdks: bool = False):

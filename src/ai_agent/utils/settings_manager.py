@@ -48,7 +48,7 @@ class APISettings:
     minimax_model: str = "MiniMax-Text-01"
     zhipuai_model: str = "glm-5"
     openrouter_model: str = "openai/gpt-4o-mini"
-    ollama_model: str = "llama3.2:3b"
+    ollama_model: str = "gpt-oss:20b-cloud"
 
 
 class SettingsManager:
@@ -64,20 +64,32 @@ class SettingsManager:
         """Load settings from config.yaml if available"""
         try:
             from pathlib import Path
-            config_path = Path(__file__).parent.parent.parent / "config.yaml"
+            config_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
+            self.logger.info(f"Loading config from: {config_path}")
+            self.logger.info(f"Config exists: {config_path.exists()}")
+            
             if config_path.exists():
                 import yaml
                 with open(config_path, 'r') as f:
                     config = yaml.safe_load(f)
+                    self.logger.info(f"Config loaded successfully: {config is not None}")
+                    
                     if config and 'api' in config:
                         api_config = config['api']
+                        self.logger.info(f"API config found: {api_config is not None}")
+                        
                         if 'preferred_provider' in api_config:
                             self._settings.preferred_provider = api_config['preferred_provider']
+                            self.logger.info(f"Preferred provider set to: {self._settings.preferred_provider}")
+                        
                         if 'local_model' in api_config:
                             self._settings.ollama_model = api_config['local_model']
+                            self.logger.info(f"Ollama model set to: {self._settings.ollama_model}")
+                        
                         # Load all provider models from config.yaml
                         if 'models' in api_config:
                             models_config = api_config['models']
+                            self.logger.info(f"Models config found: {models_config is not None}")
                             model_mapping = {
                                 'ollama': 'ollama_model',
                                 'google': 'google_model',
@@ -99,8 +111,13 @@ class SettingsManager:
                             for provider, setting_attr in model_mapping.items():
                                 if provider in models_config:
                                     setattr(self._settings, setting_attr, models_config[provider])
+                                    self.logger.info(f"{provider} model set to: {models_config[provider]}")
+                    else:
+                        self.logger.warning("No 'api' section found in config.yaml")
+            else:
+                self.logger.warning("config.yaml not found, using default settings")
         except Exception as e:
-            self.logger.debug(f"Could not load from config.yaml: {e}")
+            self.logger.error(f"Could not load from config.yaml: {e}", exc_info=True)
     
     def _load_settings(self) -> APISettings:
         """Initialize with default settings (no file loading)"""
