@@ -22,19 +22,20 @@ class TelegramClientManager:
         self.config = config or {}
         
         # Always set API credentials (required by Telethon even for bot mode)
-        self.api_id = self.config.get("api_id", 0)  # Default to placeholder, user must provide real API ID
-        self.api_hash = self.config.get("api_hash", "YOUR_API_HASH_HERE")  # Default API hash
+        # These should come from config or environment variables, not hardcoded
+        self.api_id = self.config.get("api_id") or os.getenv("TELEGRAM_API_ID")
+        self.api_hash = self.config.get("api_hash") or os.getenv("TELEGRAM_API_HASH")
         
         # Validate API credentials
-        if not self.api_id or not isinstance(self.api_id, int):
+        if not self.api_id or not isinstance(self.api_id, int) or self.api_id <= 0:
             raise ValidationError("Invalid api_id: must be a positive integer (get from https://my.telegram.org)")
-        if not self.api_hash or not isinstance(self.api_hash, str):
-            raise ValidationError("Invalid api_hash: must be a non-empty string")
-        
+        if not self.api_hash or not isinstance(self.api_hash, str) or len(self.api_hash) < 8:
+            raise ValidationError("Invalid api_hash: must be a non-empty string with at least 8 characters")
+
         # Check if bot_token is configured (Bot API mode)
         self.bot_token = self.config.get("bot_token", "")
         self.use_bot_api = bool(self.bot_token and self.bot_token.strip())
-        
+
         if self.use_bot_api:
             # Bot API mode - use bot_token
             self.logger.info("Using Bot API mode with bot_token")
@@ -58,8 +59,6 @@ class TelegramClientManager:
                     self.api_id,
                     self.api_hash
                 )
-                # Set the bot token for bot mode
-                # This will be used during connection
             else:
                 # User Account API mode
                 self.client = TelegramClient(
@@ -67,17 +66,17 @@ class TelegramClientManager:
                     self.api_id,
                     self.api_hash
                 )
-            
+
             await self.client.connect()
-            
+
             # For bot mode, sign in with bot token
             if self.use_bot_api:
                 await self.client.sign_in(bot_token=self.bot_token)
-            
+
             self.is_connected = True
             self.logger.info("Telegram client connected successfully")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Failed to connect to Telegram: {e}")
             return False
@@ -93,7 +92,11 @@ class TelegramClientManager:
         """Check if the client is authorized"""
         if not self.client or not self.is_connected:
             return False
-        return await self.client.is_user_authorized()
+        try:
+            return await self.client.is_authorized()
+        except AttributeError:
+            # Fallback for older Telethon versions
+            return await self.client.is_user_authorized()
     
     async def create_account_interactive(self, phone_number: str) -> bool:
         """

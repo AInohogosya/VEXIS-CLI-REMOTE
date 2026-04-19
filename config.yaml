@@ -8,11 +8,11 @@ api:
   
   # Ollama (local) settings
   local_endpoint: "http://localhost:11434"
-  local_model: "llama3.2:3b"
+  local_model: "gpt-oss:20b-cloud"
   
   # Model configurations for each provider
   models:
-    ollama: "llama3.2:3b"
+    ollama: "gpt-oss:20b-cloud"
     google: "gemini-3.1-pro-preview"
     groq: "llama-3.3-70b-versatile"
     openai: "gpt-4o"
@@ -27,7 +27,7 @@ api:
     together: "meta-llama/Llama-3.1-70B-Instruct-Turbo"
     minimax: "minimax-text-01"
     zhipuai: "glm-4"
-    openrouter: "anthropic/claude-3.5-sonnet"
+    openrouter: "z-ai/glm-4.5-air:free"
   
   # Timeout settings
   timeout: 30
@@ -116,14 +116,14 @@ telegram:
   
   # Telegram Bot API credentials (from BotFather)
   # Get your bot token from https://t.me/BotFather
-  bot_token: "YOUR_BOT_TOKEN_HERE"
+  bot_token: "[REDACTED]"
   bot_username: "VEXIS_cli_bot"
   
   # Telegram Client API credentials (default to official Telegram app)
   # You can use these defaults or get your own from https://my.telegram.org
   # These are used for user account operations (syncing contacts, etc.)
-  api_id: 0  # Get your API ID from https://my.telegram.org
-  api_hash: "YOUR_API_HASH_HERE"
+  api_id: "[REDACTED]"  
+  api_hash: "[REDACTED]"
   
   # Session name (stored in ~/.vexis/telegram_sessions/)
   session_name: "vexis_telegram"
@@ -131,18 +131,18 @@ telegram:
   # Contacts to sync with Telegram
   # Format: list of contact dictionaries with name and identifier
   contacts:
-    - name: "VEXIS Bot"
+    - name: "[REDACTED]"
       telegram: "@VEXIS_cli_bot"
-    - name: "YOUR_NAME"
-      phone: "YOUR_PHONE_NUMBER"
+    - name: "[REDACTED]"
+      phone: "[REDACTED]"
   
   # Authorized users for Phase 1 input (receive commands from these users)
   # Format: ["@username1", "@username2", "phone_number", "user_id"]
   # Empty list means receive from all users
-  authorized_users: []
+  authorized_users: ["[REDACTED]", "[REDACTED]"]
   
   # Phase 5: Send AI agent outputs to these contacts
-  output_recipients: ["YOUR_NAME"]  # List of contact names from contacts config
+  output_recipients: ["[REDACTED]"]  # "me" sends to self (Saved Messages) - required for bot mode
   
   # Phase 1: Enable listening for Telegram messages as prompts
   enable_input_listener: true

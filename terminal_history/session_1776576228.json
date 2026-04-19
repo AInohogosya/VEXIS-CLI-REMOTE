@@ -1,0 +1,29 @@
+{
+  "session_id": "session_1776576228",
+  "start_time": "1776576228.0321898",
+  "entries": [
+    {
+      "timestamp": "1776576266.628364",
+      "entry_type": "command",
+      "content": "/bin/zsh -c 'if ! command -v brew &> /dev/null; then ruby -e \"require \\'net/httpserver\\'; puts \\'Error: Homebrew not installed.\\';\" else echo \\'Homebrew installed.\\'; fi && brew install open-code && (brew --verbose install open-code || true) && open-code --version'",
+      "command": "/bin/zsh -c 'if ! command -v brew &> /dev/null; then ruby -e \"require \\'net/httpserver\\'; puts \\'Error: Homebrew not installed.\\';\" else echo \\'Homebrew installed.\\'; fi && brew install open-code && (brew --verbose install open-code || true) && open-code --version'",
+      "working_directory": "/Users/sasakikousei",
+      "return_code": 2,
+      "duration": 0.1327228546142578,
+      "metadata": {}
+    },
+    {
+      "timestamp": "1776576266.761087",
+      "entry_type": "error",
+      "content": "/Users/sasakikousei/tmpie_cxuiy.sh: line 2: unexpected EOF while looking for matching `\"'\n/Users/sasakikousei/tmpie_cxuiy.sh: line 3: syntax error: unexpected end of file\n",
+      "command": "/bin/zsh -c 'if ! command -v brew &> /dev/null; then ruby -e \"require \\'net/httpserver\\'; puts \\'Error: Homebrew not installed.\\';\" else echo \\'Homebrew installed.\\'; fi && brew install open-code && (brew --verbose install open-code || true) && open-code --version'",
+      "working_directory": "/Users/sasakikousei",
+      "return_code": 2,
+      "duration": 0.1327228546142578,
+      "metadata": {}
+    }
+  ],
+  "end_time": null,
+  "current_working_directory": "/Users/sasakikousei",
+  "metadata": {}
+}

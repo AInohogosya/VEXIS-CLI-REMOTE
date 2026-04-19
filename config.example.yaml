@@ -97,14 +97,16 @@ telegram:
   
   # Telegram Bot API credentials (from BotFather)
   # Get your bot token from https://t.me/BotFather
-  bot_token: ""  # e.g., "YOUR_BOT_TOKEN_HERE"
+  # RECOMMENDED: Use environment variable TELEGRAM_BOT_TOKEN instead of hardcoding
+  bot_token: ""  # e.g., "YOUR_BOT_TOKEN_HERE" or use env var: TELEGRAM_BOT_TOKEN
   bot_username: ""  # e.g., "VEXIS_cli_bot"
   
-  # Telegram Client API credentials (default to official Telegram app)
-  # You can use these defaults or get your own from https://my.telegram.org
-  # These are used for user account operations (syncing contacts, etc.)
-  api_id: 2040
-  api_hash: "YOUR_API_HASH_HERE"
+  # Telegram Client API credentials
+  # Get your own from https://my.telegram.org
+  # RECOMMENDED: Use environment variables instead of hardcoding
+  # Set TELEGRAM_API_ID and TELEGRAM_API_HASH environment variables
+  api_id: null  # or use env var: TELEGRAM_API_ID
+  api_hash: ""  # or use env var: TELEGRAM_API_HASH
   
   # Session name (stored in ~/.vexis/telegram_sessions/)
   session_name: "vexis_telegram"

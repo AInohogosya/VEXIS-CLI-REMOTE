@@ -15,7 +15,6 @@ This script automatically:
 import sys
 import os
 import subprocess
-import platform
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -307,6 +306,7 @@ def show_help():
     print("  --fix               Run environment check and auto-fix issues")
     print("  --install-sdks      Install missing AI provider SDKs")
     print("  --sdk-status        Show AI provider SDK installation status")
+    print("  --cleanup-secrets   Remove sensitive information (API keys, sessions, etc.)")
     print()
     print("Telegram Integration:")
     print("  --telegram-setup     Setup/create Telegram account via CLI")
@@ -822,8 +822,8 @@ def setup_telegram_account():
             telegram_config = {
                 "bot_token": bot_token,
                 "bot_username": bot_username,
-                "api_id": getattr(config.telegram, "api_id", 2040),
-                "api_hash": getattr(config.telegram, "api_hash", "YOUR_API_HASH_HERE"),
+                "api_id": getattr(config.telegram, "api_id", None) or os.getenv("TELEGRAM_API_ID"),
+                "api_hash": getattr(config.telegram, "api_hash", "") or os.getenv("TELEGRAM_API_HASH"),
                 "session_name": getattr(config.telegram, "session_name", "vexis_telegram")
             }
             client = await get_telegram_client(telegram_config)
@@ -858,7 +858,12 @@ def setup_telegram_account():
         
         # Create and setup Telegram client
         async def do_setup():
-            client = await get_telegram_client()
+            telegram_config = {
+                "api_id": getattr(config.telegram, "api_id", None) or os.getenv("TELEGRAM_API_ID"),
+                "api_hash": getattr(config.telegram, "api_hash", "") or os.getenv("TELEGRAM_API_HASH"),
+                "session_name": getattr(config.telegram, "session_name", "vexis_telegram")
+            }
+            client = await get_telegram_client(telegram_config)
             success = await client.create_account_interactive(phone)
             if success:
                 await client.disconnect()
@@ -895,14 +900,16 @@ def sync_telegram_contacts():
             print(f"{Colors.YELLOW}Telegram integration is not enabled in config.{Colors.RESET}")
             print(f"{Colors.CYAN}Set telegram.enabled: true in your config.yaml to enable.{Colors.RESET}")
             return False
-        
+
         # Create Telegram client
         telegram_config = {
             "api_id": config.telegram.api_id,
             "api_hash": config.telegram.api_hash,
-            "session_name": config.telegram.session_name
+            "session_name": config.telegram.session_name,
+            "bot_token": getattr(config.telegram, "bot_token", ""),
+            "bot_username": getattr(config.telegram, "bot_username", "")
         }
-        
+
         client = await get_telegram_client(config=telegram_config)
         
         # Connect to existing account
@@ -948,14 +955,16 @@ def start_telegram_listener():
         if not config.telegram.enabled:
             print(f"{Colors.YELLOW}Telegram integration is not enabled in config.{Colors.RESET}")
             return
-        
+
         # Create Telegram client
         telegram_config = {
             "api_id": config.telegram.api_id,
             "api_hash": config.telegram.api_hash,
-            "session_name": config.telegram.session_name
+            "session_name": config.telegram.session_name,
+            "bot_token": getattr(config.telegram, "bot_token", ""),
+            "bot_username": getattr(config.telegram, "bot_username", "")
         }
-        
+
         client = await get_telegram_client(config=telegram_config)
         
         # Connect to existing account
@@ -971,44 +980,43 @@ def start_telegram_listener():
         
         # Get authorized users
         authorized_users = config.telegram.authorized_users
-        
-        # Get the current event loop for thread-safe coroutine scheduling
-        event_loop = asyncio.get_event_loop()
-        
+
+        # Store the sender info for reply
+        message_sender = None
+
         # Define prompt callback
-        def process_prompt(prompt_text):
+        def process_prompt(prompt_text, sender_info=None):
+            nonlocal message_sender
+            message_sender = sender_info
+
             print(f"\n{Colors.BRIGHT_CYAN}[Telegram Message Received]{Colors.RESET}")
             print(f"{Colors.WHITE}From: Authorized user{Colors.RESET}")
             print(f"{Colors.WHITE}Message: {prompt_text}{Colors.RESET}")
             print(f"{Colors.CYAN}Processing prompt...{Colors.RESET}\n")
-            
+
             # Create 5-phase engine
             engine_config = {
                 "command_timeout": getattr(config.engine, 'command_timeout', 30),
                 "task_timeout": getattr(config.engine, 'task_timeout', 300),
                 "max_iterations": getattr(config.engine, 'max_iterations', 10),
             }
-            
+
             from ai_agent.utils.settings_manager import get_settings_manager
             settings = get_settings_manager()
             provider = settings.get_preferred_provider()
             model = settings.get_model(provider) if provider else None
-            
+
             engine = FivePhaseEngine(provider=provider, model=model, config=engine_config)
-            
+
             # Execute instruction
             context = engine.execute_instruction(prompt_text)
-            
-            # Send result back via Telegram if configured
-            if config.telegram.output_recipients:
-                # Use run_coroutine_threadsafe since we're in a thread pool
-                asyncio.run_coroutine_threadsafe(
-                    send_result_via_telegram(client, contact_manager, config, context),
-                    event_loop
-                )
+
+            # Send result back to the sender using asyncio.create_task
+            if context.final_summary and message_sender:
+                asyncio.create_task(send_result_via_telegram(client, message_sender, context.final_summary))
         
-        # Set callback
-        message_handler.set_prompt_callback(process_prompt)
+        # Set callback with sender info
+        message_handler.set_prompt_callback_with_sender(process_prompt)
         
         # Start listening
         print(f"{Colors.GREEN}Starting Telegram message listener...{Colors.RESET}")
@@ -1021,14 +1029,22 @@ def start_telegram_listener():
         finally:
             await client.disconnect()
     
-    async def send_result_via_telegram(client, contact_manager, config, context):
-        """Send Phase 5 output via Telegram"""
-        if context.final_summary:
-            recipients = config.telegram.output_recipients
-            for recipient_name in recipients:
-                contact = contact_manager.get_contact_by_name(recipient_name)
-                if contact:
-                    await client.send_message(contact["identifier"], context.final_summary)
+    async def send_result_via_telegram(client, sender, message):
+        """Send Phase 5 output back to the message sender"""
+        try:
+            # Convert User object to string identifier (username, phone, or id)
+            print(f"{Colors.GREEN}Sent result back to sender via Telegram{Colors.RESET}")
+            if hasattr(sender, 'username') and sender.username:
+                recipient = sender.username
+            elif hasattr(sender, 'phone') and sender.phone:
+                recipient = sender.phone
+            elif hasattr(sender, 'id'):
+                recipient = str(sender.id)
+            else:
+                recipient = str(sender)
+            await client.send_message(recipient, message)
+        except Exception as e:
+            print(f"{Colors.RED}Failed to send result via Telegram: {e}{Colors.RESET}")
     
     try:
         asyncio.run(do_listen())
@@ -2029,6 +2045,22 @@ def main():
         print("📱 Telegram Message Listener Mode")
         print("=" * 50)
         start_telegram_listener()
+        sys.exit(0)
+    
+    # Check for cleanup secrets request
+    if "--cleanup-secrets" in sys.argv:
+        print("🧹 Cleaning up sensitive information...")
+        print("=" * 50)
+        try:
+            import subprocess
+            result = subprocess.run([sys.executable, "cleanup_secrets.py"], 
+                                  capture_output=False, text=True, cwd=current_dir)
+            if result.returncode == 0:
+                print("\n✅ Cleanup completed successfully")
+            else:
+                print("\n⚠️ Cleanup may have encountered some issues")
+        except Exception as e:
+            print(f"❌ Failed to run cleanup: {e}")
         sys.exit(0)
     
     # Model selection - only prompt if not using --no-prompt flag

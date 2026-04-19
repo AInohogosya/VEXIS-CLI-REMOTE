@@ -115,11 +115,17 @@ python3 run.py "list files"  # Auto-setup and run!
 ### ✅ **System Requirements**
 - **Python 3.8+** (wide compatibility)
 - **4GB+ RAM** for local models (8GB+ recommended for Llama 4)
-- **API keys** for cloud providers
+- **API keys** for cloud providers (use environment variables for security)
 - **Optional**: Ollama for local AI (`curl -fsSL https://ollama.ai/install.sh | sh`)
 - **Tested on**: Ubuntu and macOS
 
 > ⚠️ **Note**: Bugs may occur with certain models or providers. If you encounter issues, please try selecting a different model or provider. We will fix the issue as soon as the cause is identified.
+
+### 🔒 **Security Best Practices**
+- **Never commit sensitive data**: `config.yaml` is excluded from Git by `.gitignore`
+- **Use environment variables**: Store API keys in environment variables instead of config files
+- **Clean up secrets**: Run `python3 run.py --cleanup-secrets` to remove sensitive information
+- **Telegram credentials**: Use `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, and `TELEGRAM_BOT_TOKEN` environment variables
 
 ### 🎨 **First Run Experience**
 VEXIS-CLI features an enhanced provider selection interface with real-time performance metrics:
@@ -160,6 +166,9 @@ python3 run.py "quick automation" --no-prompt --auto-confirm
 
 # Vision-enabled tasks
 python3 run.py "analyze this screenshot and suggest improvements" --image screenshot.png
+
+# Clean up sensitive information (API keys, sessions, etc.)
+python3 run.py --cleanup-secrets
 ```
 
 ---
@@ -201,6 +210,19 @@ logging:
   json_format: false
   console: true
   max_file_size: 10485760  # 10MB
+```
+
+**Environment Variables** (Recommended for API keys):
+```bash
+# AI Provider API Keys
+export GOOGLE_API_KEY="your_google_api_key"
+export OPENAI_API_KEY="your_openai_api_key"
+export ANTHROPIC_API_KEY="your_anthropic_api_key"
+
+# Telegram Integration
+export TELEGRAM_API_ID="your_telegram_api_id"
+export TELEGRAM_API_HASH="your_telegram_api_hash"
+export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 ```
 
 ### 🎯 **2026 Model Recommendations**

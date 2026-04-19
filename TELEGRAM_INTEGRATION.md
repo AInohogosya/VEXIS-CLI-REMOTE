@@ -24,11 +24,16 @@ pip install telethon>=1.34.0
 
 Copy `config.example.yaml` to `config.yaml` and enable Telegram:
 
+**IMPORTANT**: For security, it's recommended to use environment variables instead of hardcoding sensitive data in config.yaml.
+
 ```yaml
 telegram:
   enabled: true
-  api_id: 2040  # Default to official Telegram app
-  api_hash: "YOUR_API_HASH_HERE"
+  # Recommended: Use environment variables TELEGRAM_API_ID and TELEGRAM_API_HASH
+  api_id: null  # or set TELEGRAM_API_ID environment variable
+  api_hash: ""  # or set TELEGRAM_API_HASH environment variable
+  bot_token: ""  # or set TELEGRAM_BOT_TOKEN environment variable
+  bot_username: "VEXIS_cli_bot"
   session_name: "vexis_telegram"
   contacts:  # List of contacts (defined in config.yaml)
     - name: "VEXIS Bot"
@@ -40,7 +45,14 @@ telegram:
   enable_input_listener: false
 ```
 
-**Note**: You can use the default API credentials (from Telegram's official app) or get your own from https://my.telegram.org
+**Environment Variables** (Recommended):
+```bash
+export TELEGRAM_API_ID="your_api_id"
+export TELEGRAM_API_HASH="your_api_hash"
+export TELEGRAM_BOT_TOKEN="your_bot_token"  # For bot mode
+```
+
+**Note**: Get your API credentials from https://my.telegram.org and bot token from https://t.me/BotFather
 
 ### 3. Setup Telegram Account
 
@@ -196,6 +208,21 @@ Start Telegram message listener for Phase 1 input.
 ```bash
 python3 run.py --telegram-listen
 ```
+
+### `--cleanup-secrets`
+Remove sensitive information (API keys, sessions, phone numbers) from your system.
+
+```bash
+python3 run.py --cleanup-secrets
+```
+
+This will:
+- Remove API keys and tokens from config.yaml
+- Remove phone numbers and user IDs from config.yaml
+- Delete Telegram session files
+- Clear cache and log files
+
+**Note**: config.yaml is excluded from Git by default via .gitignore to prevent accidental commits of sensitive data.
 
 ## Security Considerations
 

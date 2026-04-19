@@ -116,8 +116,8 @@ class TelegramConfig:
     enabled: bool = False
     bot_token: str = ""
     bot_username: str = ""
-    api_id: int = 2040
-    api_hash: str = "YOUR_API_HASH_HERE"
+    api_id: Optional[int] = None  # Must be set via config or environment
+    api_hash: str = ""  # Must be set via config or environment
     session_name: str = "vexis_telegram"
     contacts: list = field(default_factory=list)
     authorized_users: list = field(default_factory=list)

@@ -1,0 +1,29 @@
+{
+  "session_id": "session_1776577020",
+  "start_time": "1776577020.951668",
+  "entries": [
+    {
+      "timestamp": "1776577073.731699",
+      "entry_type": "command",
+      "content": "sudo apt update && brew install --cask python3 openssl readline libssl-dev libffi-dev\npython3 -m ensurepip\npython3 -c \"import opencode; print(opencode.__version__)\"\n[Optional] python3 -m venv my_open_code_env && source my_open_code_env/bin/activate",
+      "command": "sudo apt update && brew install --cask python3 openssl readline libssl-dev libffi-dev\npython3 -m ensurepip\npython3 -c \"import opencode; print(opencode.__version__)\"\n[Optional] python3 -m venv my_open_code_env && source my_open_code_env/bin/activate",
+      "working_directory": "/Users/sasakikousei",
+      "return_code": -1,
+      "duration": 1192.6355471611023,
+      "metadata": {}
+    },
+    {
+      "timestamp": "1776578266.3672462",
+      "entry_type": "error",
+      "content": "\n[TIMEOUT: No output for 600s - process appears stuck]",
+      "command": "sudo apt update && brew install --cask python3 openssl readline libssl-dev libffi-dev\npython3 -m ensurepip\npython3 -c \"import opencode; print(opencode.__version__)\"\n[Optional] python3 -m venv my_open_code_env && source my_open_code_env/bin/activate",
+      "working_directory": "/Users/sasakikousei",
+      "return_code": -1,
+      "duration": 1192.6355471611023,
+      "metadata": {}
+    }
+  ],
+  "end_time": null,
+  "current_working_directory": "/Users/sasakikousei",
+  "metadata": {}
+}

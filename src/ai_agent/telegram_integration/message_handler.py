@@ -4,7 +4,6 @@ Handles incoming Telegram messages and integrates with Phase 1 input
 """
 
 import asyncio
-import queue
 from typing import Callable, Optional, Dict, Any
 from ..utils.logger import get_logger
 from .telegram_client import TelegramClientManager
@@ -16,8 +15,9 @@ class MessageHandler:
     def __init__(self, telegram_client: TelegramClientManager):
         self.logger = get_logger("message_handler")
         self.telegram_client = telegram_client
-        self.message_queue = queue.Queue()
+        self.message_queue = asyncio.Queue()
         self.prompt_callback: Optional[Callable] = None
+        self.prompt_callback_with_sender: Optional[Callable] = None
         self.is_running = False
         
     def set_prompt_callback(self, callback: Callable[[str], None]):
@@ -28,7 +28,19 @@ class MessageHandler:
             callback: Function that takes a prompt string and processes it
         """
         self.prompt_callback = callback
+        self.prompt_callback_with_sender = None
         self.logger.info("Prompt callback registered")
+    
+    def set_prompt_callback_with_sender(self, callback: Callable[[str, Any], None]):
+        """
+        Set callback function to handle incoming prompts with sender info
+        
+        Args:
+            callback: Function that takes prompt string and sender info
+        """
+        self.prompt_callback_with_sender = callback
+        self.prompt_callback = None
+        self.logger.info("Prompt callback with sender registered")
     
     async def start_listening(self, authorized_users: Optional[list] = None):
         """
@@ -107,36 +119,36 @@ class MessageHandler:
             self.logger.info(f"Received message from {sender_username or sender_id}: {message_text[:50]}...")
             
             # Add to queue
-            self.message_queue.put({
+            await self.message_queue.put({
                 "sender": sender_username or str(sender_id),
                 "message": message_text,
                 "timestamp": event.message.date
             })
             
             # Call prompt callback if registered
-            if self.prompt_callback:
+            if self.prompt_callback_with_sender:
                 try:
-                    # Run callback in thread to avoid blocking
-                    loop = asyncio.get_event_loop()
-                    if loop and not loop.is_closed():
-                        await loop.run_in_executor(
-                            None, self.prompt_callback, message_text
-                        )
-                    else:
-                        self.logger.warning("Event loop is closed, cannot execute callback")
+                    # Execute callback directly in async context
+                    self.prompt_callback_with_sender(message_text, sender)
+                except Exception as e:
+                    self.logger.error(f"Error in prompt callback: {e}")
+            elif self.prompt_callback:
+                try:
+                    # Execute callback directly in async context
+                    self.prompt_callback(message_text)
                 except Exception as e:
                     self.logger.error(f"Error in prompt callback: {e}")
             
         except Exception as e:
             self.logger.error(f"Error handling message: {e}")
     
-    def get_pending_messages(self) -> list:
+    async def get_pending_messages(self) -> list:
         """Get all pending messages from queue"""
         messages = []
         while not self.message_queue.empty():
-            messages.append(self.message_queue.get())
+            messages.append(await self.message_queue.get())
         return messages
     
-    def has_pending_messages(self) -> bool:
+    async def has_pending_messages(self) -> bool:
         """Check if there are pending messages"""
         return not self.message_queue.empty()
