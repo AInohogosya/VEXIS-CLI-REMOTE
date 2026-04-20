@@ -179,6 +179,102 @@ class FivePhaseEngine:
         except Exception as e:
             self.logger.error(f"Failed to send via Telegram: {e}")
     
+    def _check_timeout(self, context: PipelineContext) -> bool:
+        """
+        Check if the task has exceeded the timeout limit
+        
+        Args:
+            context: Current pipeline context
+            
+        Returns:
+            True if timeout has been exceeded, False otherwise
+        """
+        elapsed = time.time() - context.start_time
+        if elapsed >= self.task_timeout:
+            self.logger.warning(f"Task timeout exceeded: {elapsed:.2f}s / {self.task_timeout}s")
+            return True
+        return False
+    
+    def _save_timeout_conversation(self, context: PipelineContext):
+        """
+        Save conversation in Telegram-like format when timeout occurs
+        
+        Args:
+            context: Current pipeline context
+        """
+        try:
+            from datetime import datetime
+            from pathlib import Path
+            
+            # Create conversation directory if it doesn't exist
+            conv_dir = Path("terminal_history")
+            conv_dir.mkdir(exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            conv_file = conv_dir / f"timeout_conversation_{timestamp}.txt"
+            
+            elapsed = time.time() - context.start_time
+            
+            # Build Telegram-like conversation format
+            conversation = []
+            conversation.append("=" * 60)
+            conversation.append(f"🚫 TASK TIMEOUT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            conversation.append("=" * 60)
+            conversation.append(f"⏱️  Time elapsed: {elapsed:.2f} seconds ({elapsed/60:.2f} minutes)")
+            conversation.append(f"⏱️  Time limit: {self.task_timeout} seconds ({self.task_timeout/60:.2f} minutes)")
+            conversation.append("")
+            conversation.append("-" * 60)
+            conversation.append("📝 USER INSTRUCTION")
+            conversation.append("-" * 60)
+            conversation.append(context.user_prompt)
+            conversation.append("")
+            conversation.append("-" * 60)
+            conversation.append("🤖 AI RESPONSE HISTORY")
+            conversation.append("-" * 60)
+            
+            # Add phase outputs if available
+            if context.phase1_output:
+                conversation.append("")
+                conversation.append("📍 Phase 1 - Command Suggestion:")
+                conversation.append(context.phase1_output)
+            
+            if context.extracted_commands:
+                conversation.append("")
+                conversation.append("📍 Phase 2 - Extracted Commands:")
+                conversation.append(context.extracted_commands)
+            
+            if context.terminal_log:
+                conversation.append("")
+                conversation.append("📍 Phase 3 - Terminal Output:")
+                conversation.append(context.terminal_log)
+            
+            if context.phase4_output:
+                conversation.append("")
+                conversation.append("📍 Phase 4 - Log Evaluation:")
+                conversation.append(context.phase4_output)
+            
+            conversation.append("")
+            conversation.append("-" * 60)
+            conversation.append(f"📊 STATUS: {context.current_phase.value}")
+            conversation.append(f"🔄 Iterations: {context.iteration_count}")
+            conversation.append("-" * 60)
+            conversation.append("")
+            conversation.append("💬 This conversation was saved due to task timeout.")
+            conversation.append("💬 The task was stopped abruptly at the 45-minute limit.")
+            conversation.append("=" * 60)
+            
+            # Write to file
+            with open(conv_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(conversation))
+            
+            self.logger.info(f"Timeout conversation saved to: {conv_file}")
+            print(f"\n🚫 Task timeout exceeded ({elapsed/60:.2f} minutes)")
+            print(f"💬 Conversation saved to: {conv_file}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save timeout conversation: {e}")
+    
     def execute_instruction(self, user_prompt: str) -> PipelineContext:
         """
         Execute user instruction through the 5-phase pipeline
@@ -199,14 +295,41 @@ class FivePhaseEngine:
         )
         
         try:
+            # Check timeout before Phase 1
+            if self._check_timeout(context):
+                self._save_timeout_conversation(context)
+                context.current_phase = PipelinePhase.FAILED
+                context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                context.end_time = time.time()
+                self._cleanup_telegram()
+                return context
+            
             # Phase 1: Command Suggestion
             if not self._run_phase1(context):
                 context.current_phase = PipelinePhase.FAILED
                 context.error = "Phase 1 (Command Suggestion) failed"
                 return context
             
+            # Check timeout after Phase 1
+            if self._check_timeout(context):
+                self._save_timeout_conversation(context)
+                context.current_phase = PipelinePhase.FAILED
+                context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                context.end_time = time.time()
+                self._cleanup_telegram()
+                return context
+            
             # Phase 2-4 Loop: Extract, Execute, Evaluate until complete
             while context.iteration_count < context.max_iterations:
+                # Check timeout before each iteration
+                if self._check_timeout(context):
+                    self._save_timeout_conversation(context)
+                    context.current_phase = PipelinePhase.FAILED
+                    context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                    context.end_time = time.time()
+                    self._cleanup_telegram()
+                    return context
+                
                 context.iteration_count += 1
                 self.logger.info(f"Starting iteration {context.iteration_count}", 
                                phase=context.current_phase.value)
@@ -217,14 +340,41 @@ class FivePhaseEngine:
                     context.error = "Phase 2 (Command Extraction) failed"
                     return context
                 
+                # Check timeout after Phase 2
+                if self._check_timeout(context):
+                    self._save_timeout_conversation(context)
+                    context.current_phase = PipelinePhase.FAILED
+                    context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                    context.end_time = time.time()
+                    self._cleanup_telegram()
+                    return context
+                
                 # Phase 3: Command Execution
                 if not self._run_phase3(context):
                     context.current_phase = PipelinePhase.FAILED
                     context.error = "Phase 3 (Command Execution) failed"
                     return context
                 
+                # Check timeout after Phase 3
+                if self._check_timeout(context):
+                    self._save_timeout_conversation(context)
+                    context.current_phase = PipelinePhase.FAILED
+                    context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                    context.end_time = time.time()
+                    self._cleanup_telegram()
+                    return context
+                
                 # Phase 4: Log Evaluation
                 should_continue = self._run_phase4(context)
+                
+                # Check timeout after Phase 4
+                if self._check_timeout(context):
+                    self._save_timeout_conversation(context)
+                    context.current_phase = PipelinePhase.FAILED
+                    context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                    context.end_time = time.time()
+                    self._cleanup_telegram()
+                    return context
                 
                 if not should_continue:
                     # No "failure" in Phase 4 output - task is successful
@@ -235,6 +385,15 @@ class FivePhaseEngine:
             
             if context.iteration_count >= context.max_iterations:
                 self.logger.warning("Maximum iterations reached, forcing completion")
+            
+            # Check timeout before Phase 5
+            if self._check_timeout(context):
+                self._save_timeout_conversation(context)
+                context.current_phase = PipelinePhase.FAILED
+                context.error = f"Task timeout exceeded after {time.time() - context.start_time:.2f} seconds"
+                context.end_time = time.time()
+                self._cleanup_telegram()
+                return context
             
             # Phase 5: Summary Generation
             if not self._run_phase5(context):
@@ -426,20 +585,20 @@ class FivePhaseEngine:
     def _run_phase4(self, context: PipelineContext) -> bool:
         """
         Phase 4: Log Evaluation and Re-execution Decision
-        
+
         Send terminal logs to base model for evaluation.
-        
+
         Returns:
-            True if the Phase 4 output contains the word "failure" (continue loop),
-            False if "failure" is not present (proceed to Phase 5)
+            True if the Phase 4 output contains a code block (continue loop to Phase 2),
+            False if no code block (proceed to Phase 5)
         """
         self.logger.info("Phase 4: Log Evaluation started")
         context.current_phase = PipelinePhase.PHASE4_LOG_EVALUATION
-        
+
         try:
             # Get full terminal log
             full_terminal_log = self.terminal_history.display_terminal_log(max_entries=1000)
-            
+
             # Create request for Phase 4
             request = ModelRequest(
                 task_type=TaskType.PHASE4_LOG_EVALUATION,
@@ -451,27 +610,27 @@ class FivePhaseEngine:
                 max_tokens=4000,
                 temperature=0.5
             )
-            
+
             # Run model
             response = self.model_runner.run_model(request)
-            
+
             if not response.success:
                 self.logger.error(f"Phase 4 model execution failed: {response.error}")
                 # Assume success to proceed to Phase 5
                 return False
-            
+
             context.phase4_output = response.content
-            
-            # Check if output contains the word "failure" (case-insensitive)
-            has_failure = self._has_failure_indicator(response.content)
-            
+
+            # Check if output contains a code block
+            has_code_block = self._has_code_block(response.content)
+
             self.logger.info("Phase 4 completed",
-                           has_failure=has_failure,
+                           has_code_block=has_code_block,
                            output_length=len(response.content))
-            
-            # If "failure" is present, the task failed - continue Phase 2-4 loop
-            # If "failure" is NOT present, the task succeeded - proceed to Phase 5
-            return has_failure
+
+            # If code block is present, the task failed - continue Phase 2-4 loop
+            # If no code block, the task succeeded - proceed to Phase 5
+            return has_code_block
             
         except Exception as e:
             self.logger.error(f"Phase 4 failed: {e}")

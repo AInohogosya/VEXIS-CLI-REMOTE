@@ -64,7 +64,7 @@ class PromptTemplate:
 
             TaskType.PHASE2_COMMAND_EXTRACTION.value: '''Please look at this: {phase_1_output}. This is a relatively long text with many explanations, but please put all the necessary commands into a single code block. You may use only one code block.''',
 
-            TaskType.PHASE4_LOG_EVALUATION.value: '''I executed the commands to carry out the instruction {user_prompt}. This resulted in the following log: {full_terminal_log_so_far} However, since I am a beginner, I do not know if it succeeded or failed. IMPORTANT: If the task failed, you MUST include the word "failure" somewhere in your response. If it succeeded, simply confirm success without using the word "failure".''',
+            TaskType.PHASE4_LOG_EVALUATION.value: '''I executed the commands to carry out the instruction {user_prompt}. This resulted in the following log: {full_terminal_log_so_far} However, since I am a beginner, I do not know if it succeeded or failed. IMPORTANT: If the task failed, provide the corrected commands in a code block. If it succeeded, simply confirm success without any code block.''',
 
             TaskType.PHASE5_SUMMARY_GENERATION.value: '''I received the instruction {user_prompt} and have been executing commands like this to carry it out. {full_terminal_log} Now, I need to explain to the person who gave the instruction what I did, how I did it, and what the results were. Please summarize this information and output it inside a code block.''',
         }

@@ -106,7 +106,7 @@ class EngineConfig:
     max_task_retries: int = 3
     max_command_retries: int = 3
     command_timeout: int = 30
-    task_timeout: int = 300
+    task_timeout: int = 2700  # 45 minutes
     max_rebuilds_per_session: int = 3
 
 
