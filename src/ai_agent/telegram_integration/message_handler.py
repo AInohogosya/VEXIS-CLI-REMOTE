@@ -7,6 +7,7 @@ import asyncio
 from typing import Callable, Optional, Dict, Any
 from ..utils.logger import get_logger
 from .telegram_client import TelegramClientManager
+from ..core_processing.terminal_history import get_terminal_history
 
 
 class MessageHandler:
@@ -117,6 +118,16 @@ class MessageHandler:
                 return
             
             self.logger.info(f"Received message from {sender_username or sender_id}: {message_text[:50]}...")
+            
+            # Check for /remote command to reset conversation history
+            if "/remote" in message_text:
+                self.logger.info(f"Detected /remote command, resetting conversation history")
+                try:
+                    terminal_history = get_terminal_history()
+                    terminal_history.clear_history()
+                    self.logger.info("Conversation history successfully reset")
+                except Exception as e:
+                    self.logger.error(f"Failed to reset conversation history: {e}")
             
             # Add to queue
             await self.message_queue.put({

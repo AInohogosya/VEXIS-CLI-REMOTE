@@ -808,6 +808,14 @@ class TerminalHistory:
         except Exception as e:
             self.logger.error(f"Error ending session: {e}")
     
+    def clear_history(self) -> None:
+        """Clear all terminal history entries, resetting the conversation context"""
+        try:
+            self.terminal_session.entries = []
+            self.logger.info(f"Terminal history cleared for session: {self.session_id}")
+        except Exception as e:
+            self.logger.error(f"Error clearing terminal history: {e}")
+    
     def load_session(self, session_id: str) -> bool:
         """
         Load a previous session for context
