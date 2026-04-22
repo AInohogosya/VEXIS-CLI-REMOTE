@@ -21,6 +21,10 @@ class TelegramClientManager:
         self.session_name = session_name
         self.config = config or {}
         
+        # Check if bot_token is configured (Bot API mode) FIRST
+        self.bot_token = self.config.get("bot_token", "")
+        self.use_bot_api = bool(self.bot_token and self.bot_token.strip())
+
         # Always set API credentials (required by Telethon even for bot mode)
         # These should come from config or environment variables, not hardcoded
         self.api_id = self.config.get("api_id") or os.getenv("TELEGRAM_API_ID")
@@ -30,11 +34,11 @@ class TelegramClientManager:
         if not self.api_id or not isinstance(self.api_id, int) or self.api_id <= 0:
             raise ValidationError("Invalid api_id: must be a positive integer (get from https://my.telegram.org)")
         if not self.api_hash or not isinstance(self.api_hash, str) or len(self.api_hash) < 8:
-            raise ValidationError("Invalid api_hash: must be a non-empty string with at least 8 characters")
-
-        # Check if bot_token is configured (Bot API mode)
-        self.bot_token = self.config.get("bot_token", "")
-        self.use_bot_api = bool(self.bot_token and self.bot_token.strip())
+            if self.use_bot_api:
+                self.logger.warning("api_hash is short/invalid, but using placeholder for Bot API mode")
+                self.api_hash = self.api_hash if self.api_hash else "placeholder123"
+            else:
+                raise ValidationError("Invalid api_hash: must be a non-empty string with at least 8 characters")
 
         if self.use_bot_api:
             # Bot API mode - use bot_token

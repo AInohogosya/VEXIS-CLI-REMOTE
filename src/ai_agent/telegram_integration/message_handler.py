@@ -98,12 +98,20 @@ class MessageHandler:
             sender_phone = sender.phone if sender else None
             
             # Check if sender is authorized
+            self.logger.info(f"Message received - username: {sender_username}, id: {sender_id}, phone: {sender_phone}")
+            self.logger.info(f"Authorized users config: {self.authorized_users}")
+            
             if self.authorized_users:
                 is_authorized = False
                 for auth_user in self.authorized_users:
-                    if (sender_username and auth_user.lstrip("@").lower() == sender_username.lower()) or \
-                       (str(sender_id) == str(auth_user)) or \
-                       (sender_phone and sender_phone == auth_user):
+                    self.logger.debug(f"Checking against auth_user: '{auth_user}'")
+                    username_match = sender_username and auth_user.lstrip("@").lower() == sender_username.lower()
+                    id_match = str(sender_id) == str(auth_user)
+                    phone_match = sender_phone and sender_phone == auth_user
+                    
+                    self.logger.debug(f"Match results - username: {username_match}, id: {id_match}, phone: {phone_match}")
+                    
+                    if username_match or id_match or phone_match:
                         is_authorized = True
                         break
                 
