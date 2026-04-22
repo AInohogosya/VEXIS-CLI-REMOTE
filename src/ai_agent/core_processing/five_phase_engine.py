@@ -287,6 +287,9 @@ class FivePhaseEngine:
         """
         self.logger.info("Starting 5-Phase Pipeline execution", user_prompt=user_prompt)
         
+        # Clear terminal history to prevent showing completed tasks from previous sessions
+        self.terminal_history.clear_history()
+        
         # Initialize context
         context = PipelineContext(
             user_prompt=user_prompt,
