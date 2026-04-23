@@ -83,7 +83,7 @@ class MessageHandler:
     
     async def _handle_message(self, event):
         """
-        Handle incoming Telegram message
+        Handle incoming Telegram message with enhanced error recovery
         
         Args:
             event: Telethon NewMessage event
@@ -174,10 +174,12 @@ class MessageHandler:
             
         except Exception as e:
             self.logger.error(f"Error handling message: {e}")
+            # Don't re-raise - allow the listener to continue processing other messages
+            self.logger.info("Listener recovered from message handling error")
     
     async def _execute_task(self, task_data: Dict[str, Any]):
         """
-        Execute a single task
+        Execute a single task with comprehensive error recovery
         
         Args:
             task_data: Dictionary containing task information
@@ -203,6 +205,8 @@ class MessageHandler:
                     raise
                 except Exception as e:
                     self.logger.error(f"Error in prompt callback: {e}")
+                    # Don't re-raise - allow the listener to continue
+                    self.logger.info("Listener will continue running despite error")
             elif self.prompt_callback:
                 try:
                     # Check if callback is async
@@ -218,6 +222,13 @@ class MessageHandler:
                     raise
                 except Exception as e:
                     self.logger.error(f"Error in prompt callback: {e}")
+                    # Don't re-raise - allow the listener to continue
+                    self.logger.info("Listener will continue running despite error")
+        except Exception as e:
+            # Catch any unexpected errors at the task level
+            self.logger.error(f"Unexpected error during task execution: {e}")
+            # Ensure the listener continues running
+            self.logger.info("Listener recovered from unexpected error")
         finally:
             self.current_task = None
             self.is_processing = False

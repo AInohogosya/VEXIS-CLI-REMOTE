@@ -936,8 +936,10 @@ def sync_telegram_contacts():
         error_message(f"Error during contact sync: {e}")
 
 def start_telegram_listener():
-    """Start Telegram message listener for Phase 1 input"""
+    """Start Telegram message listener for Phase 1 input with robust error handling"""
     import asyncio
+    import traceback
+    from datetime import datetime
     from ai_agent.telegram_integration.telegram_client import get_telegram_client
     from ai_agent.telegram_integration.contact_manager import ContactManager
     from ai_agent.telegram_integration.message_handler import MessageHandler
@@ -945,6 +947,32 @@ def start_telegram_listener():
     from ai_agent.utils.config import ConfigManager
     from ai_agent.utils.interactive_menu import Colors, success_message, error_message
     from pathlib import Path
+    
+    async def send_error_via_telegram(client, sender, error_message_text, original_prompt=None):
+        """Send error notification via Telegram"""
+        try:
+            # Convert User object to string identifier
+            if hasattr(sender, 'username') and sender.username:
+                recipient = sender.username
+            elif hasattr(sender, 'phone') and sender.phone:
+                recipient = sender.phone
+            elif hasattr(sender, 'id'):
+                recipient = str(sender.id)
+            else:
+                recipient = str(sender)
+            
+            # Format error message
+            error_msg = f"❌ **Error occurred**\n\n"
+            error_msg += f"{error_message_text}\n\n"
+            if original_prompt:
+                error_msg += f"Original prompt: {original_prompt[:200]}\n\n"
+            error_msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            error_msg += f"The listener is still running and ready for new commands."
+            
+            await client.send_message(recipient, error_msg)
+            print(f"{Colors.YELLOW}Error notification sent via Telegram{Colors.RESET}")
+        except Exception as e:
+            print(f"{Colors.RED}Failed to send error notification via Telegram: {e}{Colors.RESET}")
     
     async def do_listen():
         # Load config using ConfigManager directly
@@ -985,7 +1013,7 @@ def start_telegram_listener():
         # Store the sender info for reply
         message_sender = None
 
-        # Define prompt callback
+        # Define prompt callback with comprehensive error handling
         async def process_prompt(prompt_text, sender_info=None):
             nonlocal message_sender
             message_sender = sender_info
@@ -995,38 +1023,74 @@ def start_telegram_listener():
             print(f"{Colors.WHITE}Message: {prompt_text}{Colors.RESET}")
             print(f"{Colors.CYAN}Processing prompt...{Colors.RESET}\n")
 
-            # Create 5-phase engine
-            engine_config = {
-                "command_timeout": getattr(config.engine, 'command_timeout', 30),
-                "task_timeout": getattr(config.engine, 'task_timeout', 300),
-                "max_iterations": getattr(config.engine, 'max_iterations', 10),
-            }
+            try:
+                # Create 5-phase engine
+                engine_config = {
+                    "command_timeout": getattr(config.engine, 'command_timeout', 30),
+                    "task_timeout": getattr(config.engine, 'task_timeout', 300),
+                    "max_iterations": getattr(config.engine, 'max_iterations', 10),
+                }
 
-            from ai_agent.utils.settings_manager import get_settings_manager
-            settings = get_settings_manager()
-            provider = settings.get_preferred_provider()
-            model = settings.get_model(provider) if provider else None
+                from ai_agent.utils.settings_manager import get_settings_manager
+                settings = get_settings_manager()
+                provider = settings.get_preferred_provider()
+                model = settings.get_model(provider) if provider else None
 
-            engine = FivePhaseEngine(provider=provider, model=model, config=engine_config)
+                engine = FivePhaseEngine(provider=provider, model=model, config=engine_config)
 
-            # Execute instruction
-            context = engine.execute_instruction(prompt_text)
+                # Execute instruction with error handling
+                context = engine.execute_instruction(prompt_text)
 
-            # Send result back to the sender
-            if context.final_summary and message_sender:
-                await send_result_via_telegram(client, message_sender, context.final_summary)
+                # Check if execution failed
+                if context.current_phase.value == "failed" or context.error:
+                    error_msg = f"Task execution failed.\n\nError: {context.error}\nPhase: {context.current_phase.value}"
+                    if message_sender:
+                        await send_error_via_telegram(client, message_sender, error_msg, prompt_text)
+                    print(f"{Colors.RED}Task failed: {context.error}{Colors.RESET}")
+                else:
+                    # Send result back to the sender
+                    if context.final_summary and message_sender:
+                        await send_result_via_telegram(client, message_sender, context.final_summary)
+                        print(f"{Colors.GREEN}Result sent successfully via Telegram{Colors.RESET}")
+            
+            except KeyboardInterrupt:
+                print(f"\n{Colors.YELLOW}Task interrupted by user{Colors.RESET}")
+                if message_sender:
+                    await send_error_via_telegram(client, message_sender, "Task was interrupted by user (Ctrl+C)", prompt_text)
+            except Exception as e:
+                # Comprehensive error handling
+                error_traceback = traceback.format_exc()
+                print(f"{Colors.RED}Error processing prompt: {e}{Colors.RESET}")
+                print(f"{Colors.RED}Traceback:{Colors.RESET}\n{error_traceback}")
+                
+                # Send error notification via Telegram
+                error_msg = f"An unexpected error occurred:\n\n{str(e)}\n\nThe system has recovered and is ready for new commands."
+                if message_sender:
+                    await send_error_via_telegram(client, message_sender, error_msg, prompt_text)
+                
+                # Log the error for debugging
+                print(f"{Colors.CYAN}Listener continues running...{Colors.RESET}")
         
         # Set callback with sender info
         message_handler.set_prompt_callback_with_sender(process_prompt)
         
-        # Start listening
-        print(f"{Colors.GREEN}Starting Telegram message listener...{Colors.RESET}")
-        print(f"{Colors.CYAN}Press Ctrl+C to stop{Colors.RESET}\n")
+        # Start listening with error recovery
+        print(f"{Colors.GREEN}Starting Telegram message listener with error recovery...{Colors.RESET}")
+        print(f"{Colors.CYAN}Press Ctrl+C to stop{Colors.RESET}")
+        print(f"{Colors.YELLOW}The listener will automatically recover from errors and continue running.{Colors.RESET}\n")
         
         try:
             await message_handler.start_listening(authorized_users)
         except KeyboardInterrupt:
             print(f"\n{Colors.YELLOW}Listener stopped by user{Colors.RESET}")
+        except Exception as e:
+            print(f"\n{Colors.RED}Fatal error in listener: {e}{Colors.RESET}")
+            print(f"{Colors.RED}Traceback:{Colors.RESET}\n{traceback.format_exc()}")
+            print(f"{Colors.YELLOW}Attempting to restart listener...{Colors.RESET}")
+            # Brief delay before restart
+            await asyncio.sleep(2)
+            # Restart the listener
+            await do_listen()
         finally:
             await client.disconnect()
     
@@ -1034,7 +1098,6 @@ def start_telegram_listener():
         """Send Phase 5 output back to the message sender"""
         try:
             # Convert User object to string identifier (username, phone, or id)
-            print(f"{Colors.GREEN}Sent result back to sender via Telegram{Colors.RESET}")
             if hasattr(sender, 'username') and sender.username:
                 recipient = sender.username
             elif hasattr(sender, 'phone') and sender.phone:
@@ -1049,8 +1112,15 @@ def start_telegram_listener():
     
     try:
         asyncio.run(do_listen())
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}Listener stopped by user{Colors.RESET}")
     except Exception as e:
-        error_message(f"Error in Telegram listener: {e}")
+        error_message(f"Fatal error in Telegram listener: {e}")
+        print(f"{Colors.YELLOW}Attempting to restart listener in 5 seconds...{Colors.RESET}")
+        import time
+        time.sleep(5)
+        # Recursive restart
+        start_telegram_listener()
 
 def configure_ollama_provider():
     """Configure Ollama provider with model selection"""
@@ -2123,19 +2193,91 @@ def main():
             print("\n✓ Task completed successfully")
         else:
             print("\n✗ Task failed")
+            # Send error notification via Telegram if configured
+            try:
+                import asyncio
+                from ai_agent.telegram_integration.error_notifier import send_error_notification_sync
+                asyncio.run(send_error_notification_sync(
+                    f"Task execution failed with exit code {result}",
+                    context={"instruction": instruction, "provider": selected_provider, "model": selected_model}
+                ))
+            except Exception as notification_error:
+                print(f"Failed to send error notification: {notification_error}")
             sys.exit(1)
             
     except ImportError as e:
         print(f"Import error: {e}")
         print("This suggests a dependency issue. The virtual environment may not be set up correctly.")
         print("Try deleting the 'venv' directory and running again.")
+        # Send error notification via Telegram if configured
+        try:
+            import asyncio
+            from ai_agent.telegram_integration.error_notifier import send_error_notification_sync
+            asyncio.run(send_error_notification_sync(
+                f"Import error: {e}",
+                context={"instruction": instruction, "error_type": "ImportError"}
+            ))
+        except Exception as notification_error:
+            print(f"Failed to send error notification: {notification_error}")
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n⚠ Task interrupted by user")
+        # Send notification via Telegram if configured
+        try:
+            import asyncio
+            from ai_agent.telegram_integration.error_notifier import send_error_notification_sync
+            asyncio.run(send_error_notification_sync(
+                "Task was interrupted by user (Ctrl+C)",
+                context={"instruction": instruction}
+            ))
+        except Exception as notification_error:
+            print(f"Failed to send error notification: {notification_error}")
+        sys.exit(130)
     except Exception as e:
         print(f"Error: {e}")
         if debug_mode:
             import traceback
             traceback.print_exc()
+        
+        # Send error notification via Telegram if configured
+        try:
+            import asyncio
+            from ai_agent.telegram_integration.error_notifier import send_error_notification_sync
+            error_context = {
+                "instruction": instruction,
+                "provider": selected_provider,
+                "model": selected_model,
+                "error_type": type(e).__name__
+            }
+            asyncio.run(send_error_notification_sync(
+                f"Unexpected error: {str(e)}",
+                context=error_context
+            ))
+        except Exception as notification_error:
+            print(f"Failed to send error notification: {notification_error}")
+        
         sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n⚠ Program interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Try to send fatal error notification via Telegram
+        try:
+            import asyncio
+            from ai_agent.telegram_integration.error_notifier import send_error_notification_sync
+            asyncio.run(send_error_notification_sync(
+                f"Fatal error in main(): {str(e)}",
+                context={"error_type": "FatalError"}
+            ))
+        except Exception:
+            pass  # Ignore notification errors in fatal handler
+        
+        sys.exit(1)

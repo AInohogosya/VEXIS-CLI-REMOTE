@@ -49,6 +49,7 @@ class PipelineContext:
     end_time: Optional[float] = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    phase2_consecutive_failures: int = 0
 
 
 class FivePhaseEngine:
@@ -339,6 +340,11 @@ class FivePhaseEngine:
                 
                 # Phase 2: Command Extraction
                 if not self._run_phase2(context):
+                    # Check if we've had 3 consecutive Phase 2 failures
+                    if context.phase2_consecutive_failures >= 3:
+                        self.logger.warning("Phase 2 failed 3 times consecutively, forcing Phase 5")
+                        # Break out of the loop to proceed to Phase 5
+                        break
                     context.current_phase = PipelinePhase.FAILED
                     context.error = "Phase 2 (Command Extraction) failed"
                     return context
@@ -523,6 +529,8 @@ class FivePhaseEngine:
                     self.logger.error(f"Phase 2 model execution failed: {response.error}")
                     if attempt < max_retries - 1:
                         continue
+                    context.phase2_consecutive_failures += 1
+                    self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                 
                 # Extract code block from response
@@ -530,6 +538,8 @@ class FivePhaseEngine:
                 
                 if commands:
                     context.extracted_commands = commands
+                    # Reset consecutive failures counter on success
+                    context.phase2_consecutive_failures = 0
                     self.logger.info("Phase 2 completed successfully",
                                    commands_length=len(commands))
                     return True
@@ -537,12 +547,16 @@ class FivePhaseEngine:
                     self.logger.warning(f"Phase 2: No code block found in attempt {attempt + 1}")
                     if attempt < max_retries - 1:
                         continue
+                    context.phase2_consecutive_failures += 1
+                    self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                     
             except Exception as e:
                 self.logger.error(f"Phase 2 failed on attempt {attempt + 1}: {e}")
                 if attempt < max_retries - 1:
                     continue
+                context.phase2_consecutive_failures += 1
+                self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                 return False
         
         return False
