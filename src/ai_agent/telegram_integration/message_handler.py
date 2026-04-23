@@ -20,6 +20,10 @@ class MessageHandler:
         self.prompt_callback: Optional[Callable] = None
         self.prompt_callback_with_sender: Optional[Callable] = None
         self.is_running = False
+        self.is_processing = False
+        self.current_task: Optional[asyncio.Task] = None
+        self.task_queue: list = []
+        self.max_queue_size = 15
         
     def set_prompt_callback(self, callback: Callable[[str], None]):
         """
@@ -137,29 +141,111 @@ class MessageHandler:
                 except Exception as e:
                     self.logger.error(f"Failed to reset conversation history: {e}")
             
-            # Add to queue
+            # Add to message queue
             await self.message_queue.put({
                 "sender": sender_username or str(sender_id),
                 "message": message_text,
                 "timestamp": event.message.date
             })
             
+            # Handle task queuing
+            task_data = {
+                "sender": sender,
+                "message": message_text,
+                "sender_username": sender_username,
+                "sender_id": sender_id
+            }
+            
+            if self.is_processing:
+                # A task is currently running
+                if len(self.task_queue) >= self.max_queue_size:
+                    self.logger.warning(f"Task queue is full (max {self.max_queue_size}). Dropping new task.")
+                    return
+                # Add new task to queue
+                self.task_queue.append(task_data)
+                self.logger.info(f"Task added to queue. Queue size: {len(self.task_queue)}/{self.max_queue_size}")
+                # Terminate current task
+                await self.terminate_current_task()
+                # Process queue (will execute the new task)
+                await self._process_queue()
+            else:
+                # No task running, execute immediately
+                await self._execute_task(task_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error handling message: {e}")
+    
+    async def _execute_task(self, task_data: Dict[str, Any]):
+        """
+        Execute a single task
+        
+        Args:
+            task_data: Dictionary containing task information
+        """
+        self.is_processing = True
+        message_text = task_data["message"]
+        sender = task_data["sender"]
+        
+        try:
             # Call prompt callback if registered
             if self.prompt_callback_with_sender:
                 try:
-                    # Execute callback directly in async context
-                    self.prompt_callback_with_sender(message_text, sender)
+                    # Check if callback is async
+                    if asyncio.iscoroutinefunction(self.prompt_callback_with_sender):
+                        # Create and track the task
+                        self.current_task = asyncio.create_task(self.prompt_callback_with_sender(message_text, sender))
+                        await self.current_task
+                    else:
+                        # Execute synchronous callback
+                        self.prompt_callback_with_sender(message_text, sender)
+                except asyncio.CancelledError:
+                    self.logger.info("Task execution was cancelled")
+                    raise
                 except Exception as e:
                     self.logger.error(f"Error in prompt callback: {e}")
             elif self.prompt_callback:
                 try:
-                    # Execute callback directly in async context
-                    self.prompt_callback(message_text)
+                    # Check if callback is async
+                    if asyncio.iscoroutinefunction(self.prompt_callback):
+                        # Create and track the task
+                        self.current_task = asyncio.create_task(self.prompt_callback(message_text))
+                        await self.current_task
+                    else:
+                        # Execute synchronous callback
+                        self.prompt_callback(message_text)
+                except asyncio.CancelledError:
+                    self.logger.info("Task execution was cancelled")
+                    raise
                 except Exception as e:
                     self.logger.error(f"Error in prompt callback: {e}")
-            
-        except Exception as e:
-            self.logger.error(f"Error handling message: {e}")
+        finally:
+            self.current_task = None
+            self.is_processing = False
+            # Process next task in queue if any
+            await self._process_queue()
+    
+    async def _process_queue(self):
+        """Process the next task in the queue"""
+        if self.task_queue and not self.is_processing:
+            next_task = self.task_queue.pop(0)
+            self.logger.info(f"Processing next task from queue. Remaining: {len(self.task_queue)}")
+            await self._execute_task(next_task)
+    
+    async def terminate_current_task(self):
+        """Terminate the currently running task"""
+        if self.current_task and not self.current_task.done():
+            self.logger.info("Terminating current task...")
+            self.current_task.cancel()
+            try:
+                await self.current_task
+            except asyncio.CancelledError:
+                self.logger.info("Current task cancelled successfully")
+            self.current_task = None
+            self.is_processing = False
+    
+    def get_queue_size(self) -> int:
+        """Get the current size of the task queue"""
+        return len(self.task_queue)
     
     async def get_pending_messages(self) -> list:
         """Get all pending messages from queue"""

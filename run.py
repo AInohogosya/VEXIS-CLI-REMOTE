@@ -986,7 +986,7 @@ def start_telegram_listener():
         message_sender = None
 
         # Define prompt callback
-        def process_prompt(prompt_text, sender_info=None):
+        async def process_prompt(prompt_text, sender_info=None):
             nonlocal message_sender
             message_sender = sender_info
 
@@ -1012,9 +1012,9 @@ def start_telegram_listener():
             # Execute instruction
             context = engine.execute_instruction(prompt_text)
 
-            # Send result back to the sender using asyncio.create_task
+            # Send result back to the sender
             if context.final_summary and message_sender:
-                asyncio.create_task(send_result_via_telegram(client, message_sender, context.final_summary))
+                await send_result_via_telegram(client, message_sender, context.final_summary)
         
         # Set callback with sender info
         message_handler.set_prompt_callback_with_sender(process_prompt)
