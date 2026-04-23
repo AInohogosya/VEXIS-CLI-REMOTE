@@ -432,43 +432,55 @@ class FivePhaseEngine:
         Send user prompt to base model with system prompt to get natural-language
         description of what commands should be run.
         
+        If model execution fails, re-run Phase 1 (up to 3 retries).
+        
         Returns:
             True if successful, False otherwise
         """
         self.logger.info("Phase 1: Command Suggestion started")
         context.current_phase = PipelinePhase.PHASE1_COMMAND_SUGGESTION
         
-        try:
-            os_info = context.metadata.get("os_info", self._get_os_info())
-            
-            # Create request for Phase 1
-            request = ModelRequest(
-                task_type=TaskType.PHASE1_COMMAND_SUGGESTION,
-                prompt=context.user_prompt,
-                context={
-                    "user_prompt": context.user_prompt,
-                    "os_info": os_info,
-                },
-                max_tokens=4000,
-                temperature=0.7
-            )
-            
-            # Run model
-            response = self.model_runner.run_model(request)
-            
-            if not response.success:
-                self.logger.error(f"Phase 1 model execution failed: {response.error}")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                os_info = context.metadata.get("os_info", self._get_os_info())
+                
+                # Create request for Phase 1
+                request = ModelRequest(
+                    task_type=TaskType.PHASE1_COMMAND_SUGGESTION,
+                    prompt=context.user_prompt,
+                    context={
+                        "user_prompt": context.user_prompt,
+                        "os_info": os_info,
+                    },
+                    max_tokens=4000,
+                    temperature=0.7
+                )
+                
+                # Run model
+                response = self.model_runner.run_model(request)
+                
+                if not response.success:
+                    self.logger.error(f"Phase 1 model execution failed: {response.error}")
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Phase 1: Retrying (attempt {attempt + 2}/{max_retries})")
+                        continue
+                    return False
+                
+                context.phase1_output = response.content
+                self.logger.info("Phase 1 completed successfully", 
+                               output_length=len(response.content) if response.content else 0)
+                
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Phase 1 failed on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"Phase 1: Retrying (attempt {attempt + 2}/{max_retries})")
+                    continue
                 return False
-            
-            context.phase1_output = response.content
-            self.logger.info("Phase 1 completed successfully", 
-                           output_length=len(response.content) if response.content else 0)
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Phase 1 failed: {e}")
-            return False
+        
+        return False
     
     def _run_phase2(self, context: PipelineContext) -> bool:
         """
@@ -543,47 +555,62 @@ class FivePhaseEngine:
         Reuse the same terminal session throughout the entire task.
         Terminal logs accumulate continuously.
         
+        If command execution fails, re-run Phase 3 (up to 3 retries).
+        
         Returns:
             True if successful, False otherwise
         """
         self.logger.info("Phase 3: Command Execution started")
         context.current_phase = PipelinePhase.PHASE3_COMMAND_EXECUTION
         
-        try:
-            if not context.extracted_commands:
-                self.logger.error("Phase 3: No commands to execute")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if not context.extracted_commands:
+                    self.logger.error("Phase 3: No commands to execute")
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Phase 3: Retrying (attempt {attempt + 2}/{max_retries})")
+                        continue
+                    return False
+                
+                # Parse commands from the extracted code block
+                commands = self._parse_commands(context.extracted_commands)
+                
+                if not commands:
+                    self.logger.error("Phase 3: No valid commands parsed")
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Phase 3: Retrying (attempt {attempt + 2}/{max_retries})")
+                        continue
+                    return False
+                
+                self.logger.info(f"Phase 3: Executing {len(commands)} commands in batch")
+                
+                # Execute all commands in a single batch (maintaining same terminal session)
+                result = self.terminal_history.execute_commands_batch(
+                    commands, 
+                    timeout=self.command_timeout
+                )
+                
+                # Log result
+                if result.get("success"):
+                    self.logger.info("Phase 3: Batch execution succeeded")
+                else:
+                    self.logger.warning(f"Phase 3: Batch execution failed: {result.get('stderr', 'Unknown')}")
+                
+                # Update terminal log in context
+                context.terminal_log = self.terminal_history.display_terminal_log(max_entries=1000)
+                
+                self.logger.info("Phase 3 completed successfully")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Phase 3 failed on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"Phase 3: Retrying (attempt {attempt + 2}/{max_retries})")
+                    continue
                 return False
-            
-            # Parse commands from the extracted code block
-            commands = self._parse_commands(context.extracted_commands)
-            
-            if not commands:
-                self.logger.error("Phase 3: No valid commands parsed")
-                return False
-            
-            self.logger.info(f"Phase 3: Executing {len(commands)} commands in batch")
-            
-            # Execute all commands in a single batch (maintaining same terminal session)
-            result = self.terminal_history.execute_commands_batch(
-                commands, 
-                timeout=self.command_timeout
-            )
-            
-            # Log result
-            if result.get("success"):
-                self.logger.info("Phase 3: Batch execution succeeded")
-            else:
-                self.logger.warning(f"Phase 3: Batch execution failed: {result.get('stderr', 'Unknown')}")
-            
-            # Update terminal log in context
-            context.terminal_log = self.terminal_history.display_terminal_log(max_entries=1000)
-            
-            self.logger.info("Phase 3 completed successfully")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Phase 3 failed: {e}")
-            return False
+        
+        return False
     
     def _run_phase4(self, context: PipelineContext) -> bool:
         """
