@@ -55,6 +55,9 @@ class APIConfig:
     local_endpoint: str = "http://localhost:11434"
     local_model: str = field(default_factory=lambda: _get_ollama_model_from_settings())
     
+    # API keys for all providers
+    api_keys: Dict[str, str] = field(default_factory=dict)
+    
     # Model configurations for all providers
     models: Dict[str, str] = field(default_factory=dict)
     

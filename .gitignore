@@ -39,7 +39,7 @@ ENV/
 .LSOverride
 
 # Configuration (may contain sensitive data)
-config.yaml
+# config.yaml  # Temporarily uncommented for development
 *.secret
 *.key
 

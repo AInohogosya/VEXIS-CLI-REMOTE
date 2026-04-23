@@ -86,6 +86,30 @@ class SettingsManager:
                             self._settings.ollama_model = api_config['local_model']
                             self.logger.info(f"Ollama model set to: {self._settings.ollama_model}")
                         
+                        # Load API keys from config.yaml
+                        if 'api_keys' in api_config:
+                            api_keys_config = api_config['api_keys']
+                            api_key_mapping = {
+                                'google': 'google_api_key',
+                                'groq': 'groq_api_key',
+                                'openai': 'openai_api_key',
+                                'anthropic': 'anthropic_api_key',
+                                'xai': 'xai_api_key',
+                                'meta': 'meta_api_key',
+                                'mistral': 'mistral_api_key',
+                                'microsoft': 'microsoft_api_key',
+                                'cohere': 'cohere_api_key',
+                                'deepseek': 'deepseek_api_key',
+                                'together': 'together_api_key',
+                                'minimax': 'minimax_api_key',
+                                'zhipuai': 'zhipuai_api_key',
+                                'openrouter': 'openrouter_api_key'
+                            }
+                            for provider, setting_attr in api_key_mapping.items():
+                                if provider in api_keys_config and api_keys_config[provider]:
+                                    setattr(self._settings, setting_attr, api_keys_config[provider])
+                                    self.logger.info(f"{provider} API key loaded from config.yaml")
+                        
                         # Load all provider models from config.yaml
                         if 'models' in api_config:
                             models_config = api_config['models']
