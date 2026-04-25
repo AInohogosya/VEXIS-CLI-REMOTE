@@ -57,6 +57,9 @@ class FivePhaseAIAgent:
             if not instruction or not instruction.strip():
                 self.logger.error("Instruction cannot be empty")
                 return 1
+
+            # Propagate runtime mode (terminal/telegram) into engine behavior
+            self.engine.config["runtime_mode"] = options.get("runtime_mode", "terminal")
             
             # Execute instruction using 5-phase engine
             context = self.engine.execute_instruction(instruction)
