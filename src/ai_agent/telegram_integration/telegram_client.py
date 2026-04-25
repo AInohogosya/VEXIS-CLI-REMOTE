@@ -5,6 +5,9 @@ Handles Telegram account creation, authentication, and client management
 
 import os
 import asyncio
+import json
+import urllib.parse
+import urllib.request
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from telethon import TelegramClient, events
@@ -24,11 +27,17 @@ class TelegramClientManager:
         # Check if bot_token is configured (Bot API mode) FIRST
         self.bot_token = self.config.get("bot_token", "")
         self.use_bot_api = bool(self.bot_token and self.bot_token.strip())
+        self.use_bot_http_api = False
+        self._bot_me: Optional[Dict[str, Any]] = None
 
-        # Set API credentials (only required for user account mode)
-        # Bot mode can work with just bot_token
-        self.api_id = self.config.get("api_id") or os.getenv("TELEGRAM_API_ID")
-        self.api_hash = self.config.get("api_hash") or os.getenv("TELEGRAM_API_HASH")
+        # Set API credentials (required only for user account mode).
+        # Prefer avoiding api_id/api_hash entirely when bot_token is available.
+        self.api_id = self.config.get("api_id")
+        self.api_hash = self.config.get("api_hash")
+
+        if not self.use_bot_api:
+            self.api_id = self.api_id or os.getenv("TELEGRAM_API_ID")
+            self.api_hash = self.api_hash or os.getenv("TELEGRAM_API_HASH")
         
         # Only validate API credentials for user account mode
         if not self.use_bot_api:
@@ -53,12 +62,17 @@ class TelegramClientManager:
         """Connect to Telegram"""
         try:
             if self.use_bot_api:
-                # Bot API mode - use bot_token only (no api_id/api_hash needed)
-                self.client = TelegramClient(
-                    str(self.session_path),
-                    self.api_id or 0,  # Default to 0 for bot mode
-                    self.api_hash or ""  # Default to empty string for bot mode
-                )
+                # Prefer native Telegram Bot HTTP API for bot mode (no api_id/api_hash needed)
+                me = await self._bot_api_get_me()
+                if not me:
+                    return False
+
+                self.use_bot_http_api = True
+                self._bot_me = me
+                self.client = object()  # Sentinel so existing checks pass
+                self.is_connected = True
+                self.logger.info("Telegram bot connected via HTTP Bot API")
+                return True
             else:
                 # User Account API mode - requires api_id/api_hash
                 self.client = TelegramClient(
@@ -68,10 +82,6 @@ class TelegramClientManager:
                 )
 
             await self.client.connect()
-
-            # For bot mode, sign in with bot token
-            if self.use_bot_api:
-                await self.client.sign_in(bot_token=self.bot_token)
 
             self.is_connected = True
             self.logger.info("Telegram client connected successfully")
@@ -83,6 +93,11 @@ class TelegramClientManager:
     
     async def disconnect(self):
         """Disconnect from Telegram"""
+        if self.use_bot_http_api:
+            self.is_connected = False
+            self.logger.info("Telegram bot HTTP client disconnected")
+            return
+
         if self.client:
             await self.client.disconnect()
             self.is_connected = False
@@ -195,6 +210,11 @@ class TelegramClientManager:
     
     async def get_me(self):
         """Get current user information"""
+        if self.use_bot_http_api:
+            if not self.is_connected:
+                await self.connect()
+            return self._bot_me
+
         if not self.client or not self.is_connected:
             await self.connect()
         
@@ -226,6 +246,9 @@ class TelegramClientManager:
             if not self.client:
                 self.logger.error("Telegram client not initialized")
                 return False
+
+            if self.use_bot_http_api:
+                return await self._bot_api_send_message(recipient, message)
             
             # Resolve recipient with fallbacks (username, phone, or ID)
             raw_recipient = str(recipient).strip()
@@ -305,6 +328,10 @@ class TelegramClientManager:
     
     async def get_dialogs(self) -> List[Any]:
         """Get all dialogs (chats)"""
+        if self.use_bot_http_api:
+            self.logger.warning("Dialogs are not available in HTTP Bot API mode")
+            return []
+
         if not self.client or not self.is_connected:
             await self.connect()
         
@@ -316,6 +343,10 @@ class TelegramClientManager:
     
     async def get_contacts(self) -> List[Any]:
         """Get all contacts"""
+        if self.use_bot_http_api:
+            self.logger.warning("Contacts are not available in HTTP Bot API mode")
+            return []
+
         if not self.client or not self.is_connected:
             await self.connect()
         
@@ -329,6 +360,12 @@ class TelegramClientManager:
     
     def register_message_handler(self, callback):
         """Register a callback for incoming messages"""
+        if self.use_bot_http_api:
+            raise ValidationError(
+                "Message handlers are not supported in HTTP Bot API mode. "
+                "Use user-account mode (api_id/api_hash) for event listeners."
+            )
+
         if not self.client:
             raise ValidationError("Telegram client not initialized")
         
@@ -337,6 +374,51 @@ class TelegramClientManager:
             await callback(event)
         
         self.logger.info("Message handler registered")
+
+    async def _bot_api_get_me(self) -> Optional[Dict[str, Any]]:
+        """Validate bot token and fetch bot profile via Telegram HTTP Bot API."""
+        payload = await self._bot_api_request("getMe")
+        if not payload:
+            return None
+        return payload.get("result")
+
+    async def _bot_api_send_message(self, recipient: str, message: str) -> bool:
+        """Send message via Telegram HTTP Bot API."""
+        payload = await self._bot_api_request(
+            "sendMessage",
+            {"chat_id": recipient, "text": message}
+        )
+        return bool(payload and payload.get("ok"))
+
+    async def _bot_api_request(
+        self,
+        method: str,
+        data: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Make an HTTP request to Telegram Bot API asynchronously."""
+        base_url = f"https://api.telegram.org/bot{self.bot_token}/{method}"
+        encoded = None
+        headers = {}
+        if data is not None:
+            encoded = urllib.parse.urlencode(data).encode("utf-8")
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+        def _do_request() -> Dict[str, Any]:
+            req = urllib.request.Request(base_url, data=encoded, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        try:
+            response = await asyncio.to_thread(_do_request)
+            if not response.get("ok"):
+                self.logger.error(
+                    f"Telegram Bot API error on {method}: {response.get('description', 'unknown error')}"
+                )
+                return None
+            return response
+        except Exception as e:
+            self.logger.error(f"Telegram Bot API request failed on {method}: {e}")
+            return None
 
 
 async def get_telegram_client(config: Optional[Dict[str, Any]] = None) -> TelegramClientManager:
