@@ -107,6 +107,9 @@ class TelegramClientManager:
         """Check if the client is authorized"""
         if not self.client or not self.is_connected:
             return False
+        # In Bot API mode, if connected, the bot is always authorized
+        if self.use_bot_http_api:
+            return True
         try:
             return await self.client.is_authorized()
         except AttributeError:
@@ -189,11 +192,19 @@ class TelegramClientManager:
                 return False
             
             if await self.is_authorized():
-                me = await self.client.get_me()
+                me = await self.get_me()
                 if me:
-                    username_display = f"@{me.username}" if me.username else "no username"
-                    self.logger.info(f"Authorized as: {me.first_name} ({username_display})")
-                    print(f"\n✓ Connected to Telegram as: {me.first_name} ({username_display})")
+                    # Handle both dict (Bot API) and object (Telethon) responses
+                    if isinstance(me, dict):
+                        first_name = me.get('first_name', 'Unknown')
+                        username = me.get('username')
+                    else:
+                        first_name = getattr(me, 'first_name', 'Unknown')
+                        username = getattr(me, 'username', None)
+                    
+                    username_display = f"@{username}" if username else "no username"
+                    self.logger.info(f"Authorized as: {first_name} ({username_display})")
+                    print(f"\n✓ Connected to Telegram as: {first_name} ({username_display})")
                 else:
                     self.logger.info("Authorized successfully")
                     print("\n✓ Connected to Telegram successfully")
@@ -419,6 +430,67 @@ class TelegramClientManager:
         except Exception as e:
             self.logger.error(f"Telegram Bot API request failed on {method}: {e}")
             return None
+
+    async def _bot_api_get_updates(self, offset: Optional[int] = None, timeout: int = 30) -> Optional[List[Dict[str, Any]]]:
+        """Get updates via Telegram Bot API polling."""
+        data = {"timeout": timeout}
+        if offset is not None:
+            data["offset"] = offset
+        
+        payload = await self._bot_api_request("getUpdates", data)
+        if not payload:
+            return None
+        return payload.get("result", [])
+
+    async def start_polling(self, callback, authorized_users: Optional[List[str]] = None):
+        """Start polling for messages in Bot API mode."""
+        if not self.use_bot_http_api:
+            raise ValidationError("Polling is only supported in Bot API mode")
+        
+        offset = 0
+        self.logger.info("Starting Bot API polling for messages")
+        
+        while True:
+            try:
+                updates = await self._bot_api_get_updates(offset=offset, timeout=30)
+                if updates:
+                    for update in updates:
+                        update_id = update.get("update_id")
+                        message = update.get("message", {})
+                        
+                        # Update offset to acknowledge this update
+                        offset = update_id + 1
+                        
+                        # Process message
+                        if message and callback:
+                            # Create a simple message object similar to Telethon event
+                            class BotMessage:
+                                def __init__(self, msg_dict):
+                                    self.message = msg_dict
+                                    self.text = msg_dict.get("text", "")
+                                    self.chat_id = msg_dict.get("chat", {}).get("id")
+                                    self.from_user = msg_dict.get("from", {})
+                                    self.user_id = self.from_user.get("id")
+                                    self.username = self.from_user.get("username")
+                                    self.first_name = self.from_user.get("first_name", "")
+                            
+                            bot_msg = BotMessage(message)
+                            
+                            # Check if user is authorized
+                            if authorized_users:
+                                username = bot_msg.username
+                                if username and username not in authorized_users:
+                                    self.logger.warning(f"Unauthorized message from @{username}")
+                                    continue
+                            
+                            await callback(bot_msg)
+                
+                # Small delay before next poll
+                await asyncio.sleep(1)
+                
+            except Exception as e:
+                self.logger.error(f"Polling error: {e}")
+                await asyncio.sleep(5)
 
 
 async def get_telegram_client(config: Optional[Dict[str, Any]] = None) -> TelegramClientManager:

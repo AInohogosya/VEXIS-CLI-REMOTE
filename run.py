@@ -832,7 +832,16 @@ def setup_telegram_account():
             if success:
                 me = await client.get_me()
                 if me:
-                    print(f"{Colors.GREEN}Connected as bot: {me.first_name} (@{me.username}){Colors.RESET}")
+                    # Handle both dict (Bot API) and object (Telethon) responses
+                    if isinstance(me, dict):
+                        first_name = me.get('first_name', 'Unknown')
+                        username = me.get('username')
+                    else:
+                        first_name = getattr(me, 'first_name', 'Unknown')
+                        username = getattr(me, 'username', None)
+                    
+                    username_display = f"@{username}" if username else "no username"
+                    print(f"{Colors.GREEN}Connected as bot: {first_name} ({username_display}){Colors.RESET}")
                 await client.disconnect()
             return success
         

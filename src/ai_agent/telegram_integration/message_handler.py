@@ -75,25 +75,193 @@ class MessageHandler:
         self.is_running = True
         self.authorized_users = authorized_users or []
         
-        # Register message handler
-        self.telegram_client.register_message_handler(self._handle_message)
-        
-        self.logger.info(f"Started listening for messages (authorized: {len(self.authorized_users) if authorized_users else 'all'})")
-        print(f"\n📱 Listening for Telegram messages...")
-        if authorized_users:
-            print(f"   Authorized users: {', '.join(authorized_users)}")
-        
-        # Keep the client running
-        try:
-            while self.is_running:
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            self.logger.info("Message handler stopped")
+        # Check if using Bot API mode
+        if self.telegram_client.use_bot_http_api:
+            # Use polling for Bot API mode
+            self.logger.info(f"Starting Bot API polling for messages (authorized: {len(self.authorized_users) if authorized_users else 'all'})")
+            print(f"\n📱 Listening for Telegram messages via Bot API polling...")
+            if authorized_users:
+                print(f"   Authorized users: {', '.join(authorized_users)}")
+            
+            try:
+                await self.telegram_client.start_polling(self._handle_bot_message, authorized_users)
+            except asyncio.CancelledError:
+                self.logger.info("Bot API polling stopped")
+        else:
+            # Use event handler for user account mode
+            self.telegram_client.register_message_handler(self._handle_message)
+            
+            self.logger.info(f"Started listening for messages (authorized: {len(self.authorized_users) if authorized_users else 'all'})")
+            print(f"\n📱 Listening for Telegram messages...")
+            if authorized_users:
+                print(f"   Authorized users: {', '.join(authorized_users)}")
+            
+            # Keep the client running
+            try:
+                while self.is_running:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                self.logger.info("Message handler stopped")
     
     def stop_listening(self):
         """Stop listening for incoming messages"""
         self.is_running = False
         self.logger.info("Stopped listening for messages")
+    
+    async def _handle_bot_message(self, bot_message):
+        """
+        Handle incoming Telegram message from Bot API polling
+        
+        Args:
+            bot_message: BotMessage object from polling
+        """
+        try:
+            if not bot_message or not bot_message.text:
+                return
+            
+            sender_username = bot_message.username
+            sender_id = bot_message.user_id
+            sender_phone = None
+            
+            # Check if sender is authorized
+            self.logger.info(f"Message received - username: {sender_username}, id: {sender_id}")
+            self.logger.info(f"Authorized users config: {self.authorized_users}")
+            
+            if self.authorized_users:
+                is_authorized = False
+                for auth_user in self.authorized_users:
+                    self.logger.debug(f"Checking against auth_user: '{auth_user}'")
+                    username_match = sender_username and auth_user.lstrip("@").lower() == sender_username.lower()
+                    id_match = str(sender_id) == str(auth_user)
+                    
+                    self.logger.debug(f"Match results - username: {username_match}, id: {id_match}")
+                    
+                    if username_match or id_match:
+                        is_authorized = True
+                        break
+                
+                if not is_authorized:
+                    self.logger.warning(f"Unauthorized message from {sender_username or sender_id}")
+                    try:
+                        await self.telegram_client.send_message(
+                            str(bot_message.chat_id),
+                            "❌ You are not authorized to use this listener.\n"
+                            "Known fix: add your username/id to telegram.authorized_users in config.yaml,\n"
+                            "then run `python3 run.py --telegram-setup` and restart `--telegram-listen`."
+                        )
+                    except Exception as reply_error:
+                        self.logger.debug(f"Failed to send unauthorized notice: {reply_error}")
+                    return
+            
+            # Get message text
+            message_text = bot_message.text
+            
+            if not message_text or not message_text.strip():
+                return
+            
+            self.logger.info(f"Received message from {sender_username or sender_id}: {message_text[:50]}...")
+
+            # Explicit self-healing setup command
+            normalized_text = message_text.strip().lower()
+            if normalized_text.startswith("/setup"):
+                self.logger.info("Detected /setup command - running Telegram self-healing flow")
+                try:
+                    await self.telegram_client.send_message(
+                        str(bot_message.chat_id),
+                        "🛠 Running Telegram setup checks and auto-fix flow..."
+                    )
+                except Exception:
+                    pass
+
+                if self.setup_callback_with_sender:
+                    try:
+                        # Create a simple sender object
+                        class SimpleSender:
+                            def __init__(self, username, user_id, first_name):
+                                self.username = username
+                                self.id = user_id
+                                self.phone = None
+                                self.first_name = first_name
+                        
+                        sender = SimpleSender(sender_username, sender_id, bot_message.first_name)
+                        
+                        if asyncio.iscoroutinefunction(self.setup_callback_with_sender):
+                            await self.setup_callback_with_sender(message_text, sender)
+                        else:
+                            self.setup_callback_with_sender(message_text, sender)
+                    except Exception as setup_error:
+                        self.logger.error(f"Error in /setup callback: {setup_error}")
+                        try:
+                            await self.telegram_client.send_message(
+                                str(bot_message.chat_id),
+                                "❌ Setup self-healing failed.\n"
+                                "Please run `python3 run.py --telegram-setup` on the host and retry."
+                            )
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        await self.telegram_client.send_message(
+                            str(bot_message.chat_id),
+                            "ℹ️ Setup callback is not configured in this runtime.\n"
+                            "Run `python3 run.py --telegram-setup` and then `python3 run.py --telegram-listen`."
+                        )
+                    except Exception:
+                        pass
+                return
+            
+            # Check for /remote or /reset command to reset conversation history
+            if normalized_text.startswith("/remote") or normalized_text.startswith("/reset"):
+                reset_command = "/reset" if normalized_text.startswith("/reset") else "/remote"
+                self.logger.info(f"Detected {reset_command} command, resetting conversation history")
+                try:
+                    terminal_history = get_terminal_history()
+                    terminal_history.clear_history()
+                    self.logger.info("Conversation history successfully reset")
+                    await self.telegram_client.send_message(str(bot_message.chat_id), "✅ Reset complete")
+                except Exception as e:
+                    self.logger.error(f"Failed to reset conversation history: {e}")
+                    await self.telegram_client.send_message(
+                        str(bot_message.chat_id),
+                        "❌ Reset failed. The listener is still running."
+                    )
+                return
+            
+            # Add to message queue
+            await self.message_queue.put({
+                "sender": sender_username or str(sender_id),
+                "message": message_text,
+                "timestamp": None
+            })
+            
+            # Handle task queuing
+            task_data = {
+                "sender": None,  # Bot API doesn't have full sender object
+                "message": message_text,
+                "sender_username": sender_username,
+                "sender_id": sender_id
+            }
+            
+            if self.is_processing:
+                # A task is currently running
+                if len(self.task_queue) >= self.max_queue_size:
+                    self.logger.warning(f"Task queue is full (max {self.max_queue_size}). Dropping new task.")
+                    return
+                # Add new task to queue
+                self.task_queue.append(task_data)
+                self.logger.info(f"Task added to queue. Queue size: {len(self.task_queue)}/{self.max_queue_size}")
+                # Terminate current task
+                await self.terminate_current_task()
+                # Process queue (will execute the new task)
+                await self._process_queue()
+            else:
+                # No task running, execute immediately
+                await self._execute_task(task_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error handling message: {e}")
+            # Don't re-raise - allow the listener to continue processing other messages
+            self.logger.info("Listener recovered from message handling error")
     
     async def _handle_message(self, event):
         """
