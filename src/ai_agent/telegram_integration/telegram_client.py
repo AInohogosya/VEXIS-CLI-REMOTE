@@ -231,11 +231,71 @@ class TelegramClientManager:
                 self.logger.error("Telegram client not initialized")
                 return False
             
-            # Resolve recipient (username, phone, or ID)
-            entity = await self.client.get_entity(recipient)
-            
+            # Resolve recipient with fallbacks (username, phone, or ID)
+            raw_recipient = str(recipient).strip()
+            candidates = []
+
+            if raw_recipient:
+                candidates.append(raw_recipient)
+
+            # Username normalization
+            if raw_recipient.startswith("@"):
+                candidates.append(raw_recipient.lstrip("@"))
+            elif raw_recipient.isalpha() or "_" in raw_recipient:
+                candidates.append(f"@{raw_recipient}")
+
+            # Numeric user id fallback
+            if raw_recipient.isdigit():
+                candidates.append(int(raw_recipient))
+
+            # Phone normalization fallback
+            if raw_recipient.startswith("+") and raw_recipient[1:].isdigit():
+                candidates.append(raw_recipient[1:])
+
+            # De-duplicate while preserving order
+            unique_candidates = []
+            for candidate in candidates:
+                if candidate not in unique_candidates:
+                    unique_candidates.append(candidate)
+
+            entity = None
+            resolve_error = None
+            for candidate in unique_candidates:
+                try:
+                    entity = await self.client.get_entity(candidate)
+                    if entity:
+                        break
+                except Exception as e:
+                    resolve_error = e
+
+            # Final fallback: search existing dialogs by username / phone / id
             if not entity:
-                self.logger.error(f"Could not resolve recipient: {recipient}")
+                try:
+                    target_plain = raw_recipient.lstrip("@").strip().lower()
+                    async for dialog in self.client.iter_dialogs():
+                        ent = dialog.entity
+                        username = getattr(ent, "username", None)
+                        phone = getattr(ent, "phone", None)
+                        user_id = str(getattr(ent, "id", ""))
+                        if (
+                            (username and username.lower() == target_plain)
+                            or (phone and (phone == raw_recipient or phone == raw_recipient.lstrip("+")))
+                            or (raw_recipient.isdigit() and user_id == raw_recipient)
+                        ):
+                            entity = ent
+                            break
+                except Exception as e:
+                    resolve_error = resolve_error or e
+
+            if not entity:
+                known_fix = (
+                    "Could not resolve recipient. Known fixes: ensure user has started chat with the bot, "
+                    "run `python3 run.py --telegram-setup`, and re-sync contacts with `--telegram-sync`."
+                )
+                if resolve_error:
+                    self.logger.error(f"{known_fix} recipient={recipient} error={resolve_error}")
+                else:
+                    self.logger.error(f"{known_fix} recipient={recipient}")
                 return False
             
             # Send message

@@ -969,8 +969,11 @@ def start_telegram_listener():
             error_msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             error_msg += f"The listener is still running and ready for new commands."
             
-            await client.send_message(recipient, error_msg)
-            print(f"{Colors.YELLOW}Error notification sent via Telegram{Colors.RESET}")
+            sent = await client.send_message(recipient, error_msg)
+            if sent:
+                print(f"{Colors.YELLOW}Error notification sent via Telegram{Colors.RESET}")
+            else:
+                print(f"{Colors.YELLOW}Could not send error notification to {recipient}. Try /setup to auto-fix Telegram mapping.{Colors.RESET}")
         except Exception as e:
             print(f"{Colors.RED}Failed to send error notification via Telegram: {e}{Colors.RESET}")
     
@@ -1006,6 +1009,41 @@ def start_telegram_listener():
         
         # Create message handler
         message_handler = MessageHandler(client)
+
+        async def run_setup_self_healing(_message_text, sender_info=None):
+            """Run Telegram setup diagnostics and attempt auto-fixes."""
+            sender_identifier = None
+            if sender_info:
+                sender_identifier = (
+                    sender_info.username
+                    if getattr(sender_info, "username", None)
+                    else str(getattr(sender_info, "id", "unknown"))
+                )
+            try:
+                sync_ok = await contact_manager.sync_contacts_to_telegram()
+                me = await client.get_me()
+                me_display = f"@{me.username}" if me and getattr(me, "username", None) else "no username"
+
+                status_lines = [
+                    "✅ Telegram self-healing completed",
+                    f"• Session check: connected as {me_display}",
+                    f"• Contact sync: {'ok' if sync_ok else 'warning'}",
+                    "• If messages still fail, run `python3 run.py --telegram-setup` on the host to refresh session"
+                ]
+                status_msg = "\n".join(status_lines)
+
+                if sender_info:
+                    await send_result_via_telegram(client, sender_info, status_msg)
+                print(f"{Colors.GREEN}Telegram /setup self-healing executed for {sender_identifier}{Colors.RESET}")
+            except Exception as setup_error:
+                failure_msg = (
+                    "❌ Telegram self-healing encountered an error.\n"
+                    f"Error: {setup_error}\n"
+                    "Known fix: run `python3 run.py --telegram-setup` and restart `--telegram-listen`."
+                )
+                if sender_info:
+                    await send_error_via_telegram(client, sender_info, failure_msg, _message_text)
+                print(f"{Colors.RED}Telegram /setup self-healing failed: {setup_error}{Colors.RESET}")
         
         # Get authorized users
         authorized_users = config.telegram.authorized_users
@@ -1073,6 +1111,7 @@ def start_telegram_listener():
         
         # Set callback with sender info
         message_handler.set_prompt_callback_with_sender(process_prompt)
+        message_handler.set_setup_callback_with_sender(run_setup_self_healing)
         
         # Start listening with error recovery
         print(f"{Colors.GREEN}Starting Telegram message listener with error recovery...{Colors.RESET}")

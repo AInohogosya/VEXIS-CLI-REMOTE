@@ -19,6 +19,7 @@ class MessageHandler:
         self.message_queue = asyncio.Queue()
         self.prompt_callback: Optional[Callable] = None
         self.prompt_callback_with_sender: Optional[Callable] = None
+        self.setup_callback_with_sender: Optional[Callable] = None
         self.is_running = False
         self.is_processing = False
         self.current_task: Optional[asyncio.Task] = None
@@ -46,6 +47,16 @@ class MessageHandler:
         self.prompt_callback_with_sender = callback
         self.prompt_callback = None
         self.logger.info("Prompt callback with sender registered")
+
+    def set_setup_callback_with_sender(self, callback: Callable[[str, Any], None]):
+        """
+        Set callback function to handle /setup self-healing command with sender info
+
+        Args:
+            callback: Function that takes setup command text and sender info
+        """
+        self.setup_callback_with_sender = callback
+        self.logger.info("Setup callback with sender registered")
     
     async def start_listening(self, authorized_users: Optional[list] = None):
         """
@@ -121,6 +132,14 @@ class MessageHandler:
                 
                 if not is_authorized:
                     self.logger.warning(f"Unauthorized message from {sender_username or sender_id}")
+                    try:
+                        await event.reply(
+                            "❌ You are not authorized to use this listener.\n"
+                            "Known fix: add your username/id to telegram.authorized_users in config.yaml,\n"
+                            "then run `python3 run.py --telegram-setup` and restart `--telegram-listen`."
+                        )
+                    except Exception as reply_error:
+                        self.logger.debug(f"Failed to send unauthorized notice: {reply_error}")
                     return
             
             # Get message text
@@ -130,6 +149,40 @@ class MessageHandler:
                 return
             
             self.logger.info(f"Received message from {sender_username or sender_id}: {message_text[:50]}...")
+
+            # Explicit self-healing setup command
+            normalized_text = message_text.strip().lower()
+            if normalized_text.startswith("/setup"):
+                self.logger.info("Detected /setup command - running Telegram self-healing flow")
+                try:
+                    await event.reply("🛠 Running Telegram setup checks and auto-fix flow...")
+                except Exception:
+                    pass
+
+                if self.setup_callback_with_sender:
+                    try:
+                        if asyncio.iscoroutinefunction(self.setup_callback_with_sender):
+                            await self.setup_callback_with_sender(message_text, sender)
+                        else:
+                            self.setup_callback_with_sender(message_text, sender)
+                    except Exception as setup_error:
+                        self.logger.error(f"Error in /setup callback: {setup_error}")
+                        try:
+                            await event.reply(
+                                "❌ Setup self-healing failed.\n"
+                                "Please run `python3 run.py --telegram-setup` on the host and retry."
+                            )
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        await event.reply(
+                            "ℹ️ Setup callback is not configured in this runtime.\n"
+                            "Run `python3 run.py --telegram-setup` and then `python3 run.py --telegram-listen`."
+                        )
+                    except Exception:
+                        pass
+                return
             
             # Check for /remote command to reset conversation history
             if "/remote" in message_text:
