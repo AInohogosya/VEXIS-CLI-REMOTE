@@ -1087,6 +1087,15 @@ def start_telegram_listener():
 
                 # Execute instruction with error handling
                 context = engine.execute_instruction(prompt_text)
+                
+                # Always send Phase 2 objective summary if available
+                phase2_goal_summary = context.metadata.get("phase2_goal_summary")
+                if phase2_goal_summary and message_sender:
+                    await send_result_via_telegram(
+                        client,
+                        message_sender,
+                        f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
+                    )
 
                 # Send Phase 2 completion updates (one message for each Phase 2 end)
                 phase2_updates = context.metadata.get("phase2_updates", [])
@@ -1117,6 +1126,15 @@ def start_telegram_listener():
                         await send_error_via_telegram(client, message_sender, error_msg, prompt_text)
                     print(f"{Colors.RED}Task failed: {context.error}{Colors.RESET}")
                 else:
+                    # Send Phase 2 objective summary first (Telegram mode output)
+                    phase2_goal_summary = context.metadata.get("phase2_goal_summary")
+                    if phase2_goal_summary and message_sender:
+                        await send_result_via_telegram(
+                            client,
+                            message_sender,
+                            f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
+                        )
+
                     # Send result back to the sender
                     if context.final_summary and message_sender:
                         await send_result_via_telegram(client, message_sender, context.final_summary)
