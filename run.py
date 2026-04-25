@@ -1097,6 +1097,28 @@ def start_telegram_listener():
                         f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
                     )
 
+                # Send Phase 2 completion updates (one message for each Phase 2 end)
+                phase2_updates = context.metadata.get("phase2_updates", [])
+                send_phase2_updates = getattr(config.telegram, "send_phase2_end_updates", True)
+                if message_sender and phase2_updates and send_phase2_updates:
+                    for idx, update in enumerate(phase2_updates, start=1):
+                        status = "✅" if update.get("status") == "success" else "⚠️"
+                        update_message = (
+                            f"{status} Phase 2 update #{idx}\n"
+                            f"Iteration: {update.get('iteration')}\n"
+                            f"{update.get('detail')}"
+                        )
+                        await send_result_via_telegram(client, message_sender, update_message)
+                
+                # Always send Phase 2 objective summary if available
+                phase2_goal_summary = context.metadata.get("phase2_goal_summary")
+                if phase2_goal_summary and message_sender:
+                    await send_result_via_telegram(
+                        client,
+                        message_sender,
+                        f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
+                    )
+
                 # Check if execution failed
                 if context.current_phase.value == "failed" or context.error:
                     error_msg = f"Task execution failed.\n\nError: {context.error}\nPhase: {context.current_phase.value}"

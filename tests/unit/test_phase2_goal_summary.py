@@ -28,6 +28,8 @@ def test_phase2_generates_goal_summary_and_prints_in_terminal_mode(monkeypatch, 
     assert engine._run_phase2(context) is True
     assert context.phase2_goal_summary == "Set up the project and run validation."
     assert context.metadata.get("phase2_goal_summary") == "Set up the project and run validation."
+    assert context.metadata.get("phase2_updates")
+    assert context.metadata["phase2_updates"][-1]["status"] == "success"
 
     out = capsys.readouterr().out
     assert "Phase 2 goal summary" in out
@@ -46,6 +48,8 @@ def test_phase2_generates_goal_summary_without_terminal_print_in_telegram_mode(m
 
     assert engine._run_phase2(context) is True
     assert context.metadata.get("phase2_goal_summary") == "Deploy the app successfully."
+    assert context.metadata.get("phase2_updates")
+    assert context.metadata["phase2_updates"][-1]["status"] == "success"
 
     out = capsys.readouterr().out
     assert "Phase 2 goal summary" not in out

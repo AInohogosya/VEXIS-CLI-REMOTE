@@ -540,6 +540,14 @@ class FivePhaseEngine:
                     if attempt < max_retries - 1:
                         continue
                     context.phase2_consecutive_failures += 1
+                    self._record_phase2_update(
+                        context=context,
+                        status="failed",
+                        detail=(
+                            f"Phase 2 model call failed (iteration {context.iteration_count}, "
+                            f"attempt {attempt + 1}): {response.error}"
+                        )
+                    )
                     self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                 
@@ -550,6 +558,11 @@ class FivePhaseEngine:
                     context.extracted_commands = commands
                     # Reset consecutive failures counter on success
                     context.phase2_consecutive_failures = 0
+                    self._record_phase2_update(
+                        context=context,
+                        status="success",
+                        detail=f"Phase 2 completed (iteration {context.iteration_count}): extracted command block."
+                    )
                     self.logger.info("Phase 2 completed successfully",
                                    commands_length=len(commands))
                     return True
@@ -558,6 +571,11 @@ class FivePhaseEngine:
                     if attempt < max_retries - 1:
                         continue
                     context.phase2_consecutive_failures += 1
+                    self._record_phase2_update(
+                        context=context,
+                        status="failed",
+                        detail=f"Phase 2 ended without a code block (iteration {context.iteration_count}, attempt {attempt + 1})."
+                    )
                     self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                     
@@ -566,10 +584,24 @@ class FivePhaseEngine:
                 if attempt < max_retries - 1:
                     continue
                 context.phase2_consecutive_failures += 1
+                self._record_phase2_update(
+                    context=context,
+                    status="failed",
+                    detail=f"Phase 2 exception on final attempt (iteration {context.iteration_count}): {e}"
+                )
                 self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                 return False
         
         return False
+
+    def _record_phase2_update(self, context: PipelineContext, status: str, detail: str) -> None:
+        """Record per-iteration Phase 2 completion updates for Telegram delivery."""
+        updates = context.metadata.setdefault("phase2_updates", [])
+        updates.append({
+            "status": status,
+            "iteration": context.iteration_count,
+            "detail": detail,
+        })
 
     def _summarize_phase2_goal(self, phase_input: str) -> Optional[str]:
         """
