@@ -25,19 +25,16 @@ class TelegramClientManager:
         self.bot_token = self.config.get("bot_token", "")
         self.use_bot_api = bool(self.bot_token and self.bot_token.strip())
 
-        # Always set API credentials (required by Telethon even for bot mode)
-        # These should come from config or environment variables, not hardcoded
+        # Set API credentials (only required for user account mode)
+        # Bot mode can work with just bot_token
         self.api_id = self.config.get("api_id") or os.getenv("TELEGRAM_API_ID")
         self.api_hash = self.config.get("api_hash") or os.getenv("TELEGRAM_API_HASH")
         
-        # Validate API credentials
-        if not self.api_id or not isinstance(self.api_id, int) or self.api_id <= 0:
-            raise ValidationError("Invalid api_id: must be a positive integer (get from https://my.telegram.org)")
-        if not self.api_hash or not isinstance(self.api_hash, str) or len(self.api_hash) < 8:
-            if self.use_bot_api:
-                self.logger.warning("api_hash is short/invalid, but using placeholder for Bot API mode")
-                self.api_hash = self.api_hash if self.api_hash else "placeholder123"
-            else:
+        # Only validate API credentials for user account mode
+        if not self.use_bot_api:
+            if not self.api_id or not isinstance(self.api_id, int) or self.api_id <= 0:
+                raise ValidationError("Invalid api_id: must be a positive integer (get from https://my.telegram.org)")
+            if not self.api_hash or not isinstance(self.api_hash, str) or len(self.api_hash) < 8:
                 raise ValidationError("Invalid api_hash: must be a non-empty string with at least 8 characters")
 
         if self.use_bot_api:
@@ -56,15 +53,14 @@ class TelegramClientManager:
         """Connect to Telegram"""
         try:
             if self.use_bot_api:
-                # Bot API mode - use bot_token with api credentials
-                # Note: Telethon requires api_id and api_hash even for bot mode
+                # Bot API mode - use bot_token only (no api_id/api_hash needed)
                 self.client = TelegramClient(
                     str(self.session_path),
-                    self.api_id,
-                    self.api_hash
+                    self.api_id or 0,  # Default to 0 for bot mode
+                    self.api_hash or ""  # Default to empty string for bot mode
                 )
             else:
-                # User Account API mode
+                # User Account API mode - requires api_id/api_hash
                 self.client = TelegramClient(
                     str(self.session_path),
                     self.api_id,
