@@ -17,6 +17,7 @@ from ..utils.config import load_config
 class TaskType(Enum):
     """Task types for 5-Phase CLI Architecture"""
     PHASE1_COMMAND_SUGGESTION = "phase1_command_suggestion"
+    PHASE2_GOAL_SUMMARY = "phase2_goal_summary"
     PHASE2_COMMAND_EXTRACTION = "phase2_command_extraction"
     PHASE4_LOG_EVALUATION = "phase4_log_evaluation"
     PHASE5_SUMMARY_GENERATION = "phase5_summary_generation"
@@ -61,6 +62,8 @@ class PromptTemplate:
         """Load prompt templates for 5-Phase CLI Architecture"""
         return {
             TaskType.PHASE1_COMMAND_SUGGESTION.value: '''I have received the instruction: "{user_prompt}". What commands should I run to carry this out? Please tell me. I can only use terminal commands, so do not suggest GUI operations. The OS I am using is {os_info}.''',
+
+            TaskType.PHASE2_GOAL_SUMMARY.value: '''Please read the following original plan content and summarize what is ultimately being achieved in exactly one sentence: {phase_1_output}''',
 
             TaskType.PHASE2_COMMAND_EXTRACTION.value: '''Please look at this: {phase_1_output}. This is a relatively long text with many explanations, but please put all the necessary commands into a single code block. You may use only one code block.''',
 

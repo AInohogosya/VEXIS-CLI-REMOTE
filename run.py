@@ -1067,6 +1067,7 @@ def start_telegram_listener():
                     "command_timeout": getattr(config.engine, 'command_timeout', 30),
                     "task_timeout": getattr(config.engine, 'task_timeout', 300),
                     "max_iterations": getattr(config.engine, 'max_iterations', 10),
+                    "runtime_mode": "telegram",
                 }
 
                 from ai_agent.utils.settings_manager import get_settings_manager
@@ -1086,6 +1087,15 @@ def start_telegram_listener():
                         await send_error_via_telegram(client, message_sender, error_msg, prompt_text)
                     print(f"{Colors.RED}Task failed: {context.error}{Colors.RESET}")
                 else:
+                    # Send Phase 2 objective summary first (Telegram mode output)
+                    phase2_goal_summary = context.metadata.get("phase2_goal_summary")
+                    if phase2_goal_summary and message_sender:
+                        await send_result_via_telegram(
+                            client,
+                            message_sender,
+                            f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
+                        )
+
                     # Send result back to the sender
                     if context.final_summary and message_sender:
                         await send_result_via_telegram(client, message_sender, context.final_summary)
@@ -2224,7 +2234,8 @@ def main():
             "debug": debug_mode,
             "max_iterations": max_iterations,
             "command_timeout": 30,
-            "task_timeout": 2700  # 45 minutes
+            "task_timeout": 2700,  # 45 minutes
+            "runtime_mode": "terminal"
         }
         result = agent.run(instruction, options)
         
