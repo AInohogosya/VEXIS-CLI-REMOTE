@@ -4,16 +4,18 @@ Handles incoming Telegram messages and integrates with Phase 1 input
 """
 
 import asyncio
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, TYPE_CHECKING
 from ..utils.logger import get_logger
-from .telegram_client import TelegramClientManager
 from ..core_processing.terminal_history import get_terminal_history
+
+if TYPE_CHECKING:
+    from .telegram_client import TelegramClientManager
 
 
 class MessageHandler:
     """Handles incoming Telegram messages for Phase 1 input"""
     
-    def __init__(self, telegram_client: TelegramClientManager):
+    def __init__(self, telegram_client: "TelegramClientManager"):
         self.logger = get_logger("message_handler")
         self.telegram_client = telegram_client
         self.message_queue = asyncio.Queue()
@@ -25,6 +27,7 @@ class MessageHandler:
         self.current_task: Optional[asyncio.Task] = None
         self.task_queue: list = []
         self.max_queue_size = 15
+        self.max_callback_retries = 1
         
     def set_prompt_callback(self, callback: Callable[[str], None]):
         """
@@ -184,15 +187,28 @@ class MessageHandler:
                         pass
                 return
             
-            # Check for /remote command to reset conversation history
-            if "/remote" in message_text:
-                self.logger.info(f"Detected /remote command, resetting conversation history")
+            # Check for /remote or /reset command to reset conversation history
+            if normalized_text.startswith("/remote") or normalized_text.startswith("/reset"):
+                reset_command = "/reset" if normalized_text.startswith("/reset") else "/remote"
+                self.logger.info(f"Detected {reset_command} command, resetting conversation history")
                 try:
                     terminal_history = get_terminal_history()
                     terminal_history.clear_history()
                     self.logger.info("Conversation history successfully reset")
+                    await self._safe_reply(event, "✅ Reset complete")
                 except Exception as e:
                     self.logger.error(f"Failed to reset conversation history: {e}")
+                    await self._notify_error(
+                        event=event,
+                        error=e,
+                        user_message="❌ Reset failed. The listener is still running.",
+                        context={
+                            "phase": "command_preprocess",
+                            "command": reset_command,
+                            "action": "reset_conversation_history"
+                        }
+                    )
+                return
             
             # Add to message queue
             await self.message_queue.put({
@@ -227,6 +243,12 @@ class MessageHandler:
             
         except Exception as e:
             self.logger.error(f"Error handling message: {e}")
+            await self._notify_error(
+                event=event,
+                error=e,
+                user_message="❌ Failed to process this message. Listener recovered and is still running.",
+                context={"phase": "message_handler", "action": "_handle_message"}
+            )
             # Don't re-raise - allow the listener to continue processing other messages
             self.logger.info("Listener recovered from message handling error")
     
@@ -242,44 +264,20 @@ class MessageHandler:
         sender = task_data["sender"]
         
         try:
-            # Call prompt callback if registered
-            if self.prompt_callback_with_sender:
-                try:
-                    # Check if callback is async
-                    if asyncio.iscoroutinefunction(self.prompt_callback_with_sender):
-                        # Create and track the task
-                        self.current_task = asyncio.create_task(self.prompt_callback_with_sender(message_text, sender))
-                        await self.current_task
-                    else:
-                        # Execute synchronous callback
-                        self.prompt_callback_with_sender(message_text, sender)
-                except asyncio.CancelledError:
-                    self.logger.info("Task execution was cancelled")
-                    raise
-                except Exception as e:
-                    self.logger.error(f"Error in prompt callback: {e}")
-                    # Don't re-raise - allow the listener to continue
-                    self.logger.info("Listener will continue running despite error")
-            elif self.prompt_callback:
-                try:
-                    # Check if callback is async
-                    if asyncio.iscoroutinefunction(self.prompt_callback):
-                        # Create and track the task
-                        self.current_task = asyncio.create_task(self.prompt_callback(message_text))
-                        await self.current_task
-                    else:
-                        # Execute synchronous callback
-                        self.prompt_callback(message_text)
-                except asyncio.CancelledError:
-                    self.logger.info("Task execution was cancelled")
-                    raise
-                except Exception as e:
-                    self.logger.error(f"Error in prompt callback: {e}")
-                    # Don't re-raise - allow the listener to continue
-                    self.logger.info("Listener will continue running despite error")
+            await self._run_callback_with_retry(task_data=task_data)
         except Exception as e:
             # Catch any unexpected errors at the task level
             self.logger.error(f"Unexpected error during task execution: {e}")
+            await self._notify_error(
+                event=None,
+                error=e,
+                user_message=None,
+                context={
+                    "phase": "task_execution",
+                    "action": "_execute_task",
+                    "sender": str(task_data.get("sender_username") or task_data.get("sender_id") or "unknown")
+                }
+            )
             # Ensure the listener continues running
             self.logger.info("Listener recovered from unexpected error")
         finally:
@@ -306,6 +304,94 @@ class MessageHandler:
                 self.logger.info("Current task cancelled successfully")
             self.current_task = None
             self.is_processing = False
+
+    async def _run_callback_with_retry(self, task_data: Dict[str, Any]):
+        """
+        Execute callback with one automatic retry to recover transient issues.
+        """
+        sender = task_data["sender"]
+        sender_label = str(task_data.get("sender_username") or task_data.get("sender_id") or "unknown")
+        message_text = task_data["message"]
+
+        for attempt in range(self.max_callback_retries + 1):
+            try:
+                if self.prompt_callback_with_sender:
+                    await self._invoke_callback(self.prompt_callback_with_sender, message_text, sender)
+                    return
+                if self.prompt_callback:
+                    await self._invoke_callback(self.prompt_callback, message_text)
+                    return
+
+                self.logger.warning("No prompt callback registered; skipping task")
+                return
+            except asyncio.CancelledError:
+                self.logger.info("Task execution was cancelled")
+                raise
+            except Exception as callback_error:
+                is_last_attempt = attempt >= self.max_callback_retries
+                self.logger.error(
+                    f"Error in prompt callback (attempt {attempt + 1}/{self.max_callback_retries + 1}): {callback_error}"
+                )
+
+                if not is_last_attempt:
+                    retry_delay_seconds = 1
+                    self.logger.info(
+                        f"Auto-recovery: retrying task for sender {sender_label} in {retry_delay_seconds} second"
+                    )
+                    await asyncio.sleep(retry_delay_seconds)
+                    continue
+
+                await self._notify_error(
+                    event=None,
+                    error=callback_error,
+                    user_message=None,
+                    context={
+                        "phase": "task_execution",
+                        "action": "prompt_callback",
+                        "sender": sender_label,
+                        "attempts": str(self.max_callback_retries + 1)
+                    }
+                )
+                self.logger.info("Listener will continue running despite callback error")
+
+    async def _invoke_callback(self, callback: Callable, *args):
+        """Invoke callback while tracking async task state."""
+        if asyncio.iscoroutinefunction(callback):
+            self.current_task = asyncio.create_task(callback(*args))
+            await self.current_task
+        else:
+            callback(*args)
+
+    async def _safe_reply(self, event, message: str):
+        """Reply to a Telegram event without breaking the listener on failure."""
+        if not event:
+            return
+        try:
+            await event.reply(message)
+        except Exception as reply_error:
+            self.logger.debug(f"Failed to send reply: {reply_error}")
+
+    async def _notify_error(
+        self,
+        event,
+        error: Exception,
+        user_message: Optional[str],
+        context: Optional[Dict[str, str]] = None
+    ):
+        """
+        Notify both the chat user (when available) and configured admin recipients.
+        """
+        if user_message:
+            await self._safe_reply(event, user_message)
+
+        try:
+            from .error_notifier import get_error_notifier
+            notifier = get_error_notifier()
+            notification_context = context or {}
+            notification_context["error_type"] = type(error).__name__
+            await notifier.send_error_notification(str(error), notification_context)
+        except Exception as notify_error:
+            self.logger.error(f"Failed to send Telegram error notification: {notify_error}")
     
     def get_queue_size(self) -> int:
         """Get the current size of the task queue"""
