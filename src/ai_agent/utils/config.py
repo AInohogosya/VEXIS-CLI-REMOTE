@@ -126,6 +126,7 @@ class TelegramConfig:
     authorized_users: list = field(default_factory=list)
     output_recipients: list = field(default_factory=list)
     enable_input_listener: bool = False
+    send_phase2_end_updates: bool = True
 
 
 @dataclass

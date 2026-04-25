@@ -1062,11 +1062,20 @@ def start_telegram_listener():
             print(f"{Colors.CYAN}Processing prompt...{Colors.RESET}\n")
 
             try:
+                # Immediate acknowledgement so sender always gets feedback
+                if message_sender:
+                    await send_result_via_telegram(
+                        client,
+                        message_sender,
+                        "⏳ Received. Running your request now."
+                    )
+
                 # Create 5-phase engine
                 engine_config = {
                     "command_timeout": getattr(config.engine, 'command_timeout', 30),
                     "task_timeout": getattr(config.engine, 'task_timeout', 300),
                     "max_iterations": getattr(config.engine, 'max_iterations', 10),
+                    "runtime_mode": "telegram",
                 }
 
                 from ai_agent.utils.settings_manager import get_settings_manager
@@ -1079,6 +1088,28 @@ def start_telegram_listener():
                 # Execute instruction with error handling
                 context = engine.execute_instruction(prompt_text)
 
+                # Send Phase 2 completion updates (one message for each Phase 2 end)
+                phase2_updates = context.metadata.get("phase2_updates", [])
+                send_phase2_updates = getattr(config.telegram, "send_phase2_end_updates", True)
+                if message_sender and phase2_updates and send_phase2_updates:
+                    for idx, update in enumerate(phase2_updates, start=1):
+                        status = "✅" if update.get("status") == "success" else "⚠️"
+                        update_message = (
+                            f"{status} Phase 2 update #{idx}\n"
+                            f"Iteration: {update.get('iteration')}\n"
+                            f"{update.get('detail')}"
+                        )
+                        await send_result_via_telegram(client, message_sender, update_message)
+                
+                # Always send Phase 2 objective summary if available
+                phase2_goal_summary = context.metadata.get("phase2_goal_summary")
+                if phase2_goal_summary and message_sender:
+                    await send_result_via_telegram(
+                        client,
+                        message_sender,
+                        f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
+                    )
+
                 # Check if execution failed
                 if context.current_phase.value == "failed" or context.error:
                     error_msg = f"Task execution failed.\n\nError: {context.error}\nPhase: {context.current_phase.value}"
@@ -1090,6 +1121,12 @@ def start_telegram_listener():
                     if context.final_summary and message_sender:
                         await send_result_via_telegram(client, message_sender, context.final_summary)
                         print(f"{Colors.GREEN}Result sent successfully via Telegram{Colors.RESET}")
+                    elif message_sender:
+                        await send_result_via_telegram(
+                            client,
+                            message_sender,
+                            "✅ Task completed, but no Phase 5 summary text was produced."
+                        )
             
             except KeyboardInterrupt:
                 print(f"\n{Colors.YELLOW}Task interrupted by user{Colors.RESET}")
@@ -2224,7 +2261,8 @@ def main():
             "debug": debug_mode,
             "max_iterations": max_iterations,
             "command_timeout": 30,
-            "task_timeout": 2700  # 45 minutes
+            "task_timeout": 2700,  # 45 minutes
+            "runtime_mode": "terminal"
         }
         result = agent.run(instruction, options)
         

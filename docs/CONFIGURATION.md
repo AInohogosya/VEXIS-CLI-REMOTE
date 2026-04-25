@@ -508,6 +508,7 @@ telegram:
   authorized_users: []
   output_recipients: ["YOUR_NAME"]
   enable_input_listener: true
+  send_phase2_end_updates: true
 ```
 
 **Settings Explained:**
@@ -522,6 +523,9 @@ telegram:
 - **authorized_users**: List of authorized users for Phase 1 input
 - **output_recipients**: List of contact names for Phase 5 output
 - **enable_input_listener**: Enable Phase 1 input listener
+- **send_phase2_end_updates**:
+  - `true`: send a Telegram message whenever Phase 2 ends
+  - `false`: do not send Phase 2 end messages
 
 **Note**: All configuration, including Telegram contacts, is now consolidated in a single `config.yaml` file. No separate JSON configuration files are needed.
 

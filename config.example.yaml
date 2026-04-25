@@ -128,3 +128,8 @@ telegram:
   
   # Phase 1: Enable listening for Telegram messages as prompts
   enable_input_listener: false
+
+  # Phase 2: Send Telegram message whenever Phase 2 ends (per iteration)
+  # true  -> send Phase 2 end updates via Telegram
+  # false -> do not send Phase 2 end updates
+  send_phase2_end_updates: true

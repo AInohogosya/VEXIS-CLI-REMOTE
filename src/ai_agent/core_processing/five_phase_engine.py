@@ -50,6 +50,7 @@ class PipelineContext:
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     phase2_consecutive_failures: int = 0
+    phase2_goal_summary: Optional[str] = None
 
 
 class FivePhaseEngine:
@@ -507,7 +508,16 @@ class FivePhaseEngine:
         # On first iteration, use Phase 1 output
         # On subsequent iterations, use Phase 4 output
         phase_input = context.phase4_output if context.phase4_output else context.phase1_output
-        
+
+        # First part of Phase 2: summarize the original plan objective in one sentence
+        if not context.phase4_output and not context.phase2_goal_summary and phase_input:
+            context.phase2_goal_summary = self._summarize_phase2_goal(phase_input)
+            if context.phase2_goal_summary:
+                context.metadata["phase2_goal_summary"] = context.phase2_goal_summary
+                runtime_mode = self.config.get("runtime_mode", "terminal")
+                if runtime_mode != "telegram":
+                    print(f"\n🎯 Phase 2 goal summary: {context.phase2_goal_summary}\n")
+
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -530,6 +540,14 @@ class FivePhaseEngine:
                     if attempt < max_retries - 1:
                         continue
                     context.phase2_consecutive_failures += 1
+                    self._record_phase2_update(
+                        context=context,
+                        status="failed",
+                        detail=(
+                            f"Phase 2 model call failed (iteration {context.iteration_count}, "
+                            f"attempt {attempt + 1}): {response.error}"
+                        )
+                    )
                     self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                 
@@ -540,6 +558,11 @@ class FivePhaseEngine:
                     context.extracted_commands = commands
                     # Reset consecutive failures counter on success
                     context.phase2_consecutive_failures = 0
+                    self._record_phase2_update(
+                        context=context,
+                        status="success",
+                        detail=f"Phase 2 completed (iteration {context.iteration_count}): extracted command block."
+                    )
                     self.logger.info("Phase 2 completed successfully",
                                    commands_length=len(commands))
                     return True
@@ -548,6 +571,11 @@ class FivePhaseEngine:
                     if attempt < max_retries - 1:
                         continue
                     context.phase2_consecutive_failures += 1
+                    self._record_phase2_update(
+                        context=context,
+                        status="failed",
+                        detail=f"Phase 2 ended without a code block (iteration {context.iteration_count}, attempt {attempt + 1})."
+                    )
                     self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                     return False
                     
@@ -556,10 +584,68 @@ class FivePhaseEngine:
                 if attempt < max_retries - 1:
                     continue
                 context.phase2_consecutive_failures += 1
+                self._record_phase2_update(
+                    context=context,
+                    status="failed",
+                    detail=f"Phase 2 exception on final attempt (iteration {context.iteration_count}): {e}"
+                )
                 self.logger.warning(f"Phase 2 consecutive failures: {context.phase2_consecutive_failures}")
                 return False
         
         return False
+
+    def _record_phase2_update(self, context: PipelineContext, status: str, detail: str) -> None:
+        """Record per-iteration Phase 2 completion updates for Telegram delivery."""
+        updates = context.metadata.setdefault("phase2_updates", [])
+        updates.append({
+            "status": status,
+            "iteration": context.iteration_count,
+            "detail": detail,
+        })
+
+    def _summarize_phase2_goal(self, phase_input: str) -> Optional[str]:
+        """
+        Summarize the Phase 1/original plan content into a single sentence.
+        This synchronization summary always uses the base model configured in config.yaml.
+        """
+        try:
+            from ..utils.config import load_config
+
+            cfg = load_config()
+            provider = getattr(cfg.api, "preferred_provider", None) or None
+
+            model = None
+            if provider == "ollama":
+                model = getattr(cfg.api, "local_model", None)
+            elif provider and getattr(cfg.api, "models", None):
+                model = cfg.api.models.get(provider)
+
+            sync_runner = ModelRunner(provider=provider, model=model, config=self.config)
+
+            request = ModelRequest(
+                task_type=TaskType.PHASE2_GOAL_SUMMARY,
+                prompt=phase_input,
+                context={"phase_1_output": phase_input},
+                max_tokens=180,
+                temperature=0.2
+            )
+
+            response = sync_runner.run_model(request)
+            if not response.success or not response.content:
+                self.logger.warning(f"Phase 2 goal summary failed: {response.error}")
+                return None
+
+            summary = self._extract_code_block(response.content) or response.content
+            summary = " ".join(summary.strip().splitlines()).strip()
+
+            if summary and not summary.endswith((".", "!", "?")):
+                summary = f"{summary}."
+
+            self.logger.info("Phase 2 goal summary generated", summary_length=len(summary))
+            return summary
+        except Exception as e:
+            self.logger.warning(f"Phase 2 goal summary exception: {e}")
+            return None
     
     def _run_phase3(self, context: PipelineContext) -> bool:
         """
