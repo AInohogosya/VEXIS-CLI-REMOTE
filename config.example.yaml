@@ -132,4 +132,7 @@ telegram:
   # Phase 2: Send Telegram message whenever Phase 2 ends (per iteration)
   # true  -> send Phase 2 end updates via Telegram
   # false -> do not send Phase 2 end updates
+  # Example modes:
+  #   send_phase2_end_updates: true    # notify on each Phase 2 end
+  #   send_phase2_end_updates: false   # silent for Phase 2 end
   send_phase2_end_updates: true
