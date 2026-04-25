@@ -1,180 +1,96 @@
-# =============================================
-# GENERAL
-# =============================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-*.stackdump
-[Dd]esktop.ini
-
-# Linux
-*~
-.nfs*
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
-# =============================================
-# NODE.JS (VEXIS-mail-CLI)
-# =============================================
-# Dependencies
-node_modules/
-.npm
-.yarn-integrity
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-
-# =============================================
-# PYTHON (VEXIS-CLI-2)
-# =============================================
-# Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.venv
-
-# Python bytecode
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-
-# Distribution / packaging
 build/
+develop-eggs/
 dist/
-*.egg-info/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
+*.egg-info/
+.installed.cfg
 *.egg
-MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# =============================================
-# EDITORS / IDES
-# =============================================
-# VS Code
+# IDE
 .vscode/
-*.code-workspace
-
-# JetBrains
 .idea/
-*.iml
-*.iws
-*.ipr
-
-# Sublime Text
-*.sublime-workspace
-*.sublime-project
-
-# Vim
 *.swp
 *.swo
 *~
 
-# Emacs
-\#*\#
-.\#*
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
 
-# =============================================
-# APPLICATION SPECIFIC
-# =============================================
-# Terminal history
-cache/
+# Configuration (may contain sensitive data)
+config.yaml
+*.secret
+*.key
+
+# Terminal history (may contain sensitive data)
 terminal_history/
-*.tmp
-*.temp
-*.bak
+session_*.json
 
-# Firebase
-.firebase/
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.tox/
 
-# Docker
-.dockerignore
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
 
-# Local environment files
+# Linting
+.pyre/
+
+# Environment variables
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
 
-# Sensitive config files
-config.local.json
-secrets.json
-credentials.json
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-# Model/Cache directories
-models/
-cache/
-temp/
+# Test instructions (temporary)
+test_instruction/
+
+# Root-level test files (temporary)
+test_*.py
+!tests/**/*.py
+
+# Node modules (if using JS)
+node_modules/
+
+# Package managers
+yarn.lock
+package-lock.json
+
+# Docker
+docker/.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
