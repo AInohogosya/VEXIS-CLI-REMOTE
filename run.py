@@ -303,11 +303,14 @@ def show_help():
     print("  🚀 MiniMax: M2-series models for productivity - Beta")
     print()
     print("Environment Commands:")
-    print("  --check, -c         Run environment check and show recommendations")
-    print("  --fix               Run environment check and auto-fix issues")
-    print("  --install-sdks      Install missing AI provider SDKs")
-    print("  --sdk-status        Show AI provider SDK installation status")
-    print("  --cleanup-secrets   Remove sensitive information (API keys, sessions, etc.)")
+    print("  --check, -c             Run environment check and show recommendations")
+    print("  --fix                   Run environment check and auto-fix issues")
+    print("  --create-venv           Create virtual environment (if not exists)")
+    print("  --install-deps          Install dependencies in virtual environment")
+    print("  --setup-env             Create venv and install dependencies (combined)")
+    print("  --install-sdks          Install missing AI provider SDKs")
+    print("  --sdk-status            Show AI provider SDK installation status")
+    print("  --cleanup-secrets       Remove sensitive information (API keys, sessions, etc.)")
     print()
     print("Telegram Integration:")
     print("  --telegram-setup     Setup/create Telegram account via CLI")
@@ -2126,10 +2129,13 @@ def main():
     sys.path.insert(0, str(src_dir))
     
     # Validate arguments
-    if len(sys.argv) < 2 and not any(flag in sys.argv for flag in ["--install-sdks", "--sdk-status", "--help", "--telegram-setup", "--telegram-sync", "--telegram-listen", "--check", "--fix"]):
+    if len(sys.argv) < 2 and not any(flag in sys.argv for flag in ["--install-sdks", "--sdk-status", "--help", "--telegram-setup", "--telegram-sync", "--telegram-listen", "--check", "--fix", "--create-venv", "--install-deps", "--setup-env"]):
         print("Usage: python3 run.py \"your instruction here\"")
         print("Example: python3 run.py \"Take a screenshot\"")
         print("\nOptions:")
+        print("  --create-venv     Create virtual environment")
+        print("  --install-deps    Install dependencies")
+        print("  --setup-env       Create venv and install dependencies")
         print("  --install-sdks    Install missing AI provider SDKs")
         print("  --sdk-status      Show SDK installation status")
         print("  --debug           Enable debug mode")
@@ -2146,7 +2152,11 @@ def main():
         print("  python3 run.py \"Take a screenshot\"")
         print("  python3 run.py \"Create a new folder called projects\"")
         print("  python3 run.py \"List all files in current directory\"")
-        print("\nOptions:")
+        print("\nEnvironment Options:")
+        print("  --create-venv     Create virtual environment")
+        print("  --install-deps    Install dependencies")
+        print("  --setup-env       Setup environment (venv + dependencies)")
+        print("\nOther Options:")
         print("  --install-sdks    Install missing AI provider SDKs")
         print("  --sdk-status      Show AI provider SDK installation status")
         print("  --debug           Enable debug mode")
@@ -2164,7 +2174,7 @@ def main():
     instruction = " ".join(instruction_args)
     
     # Allow SDK management and Telegram commands without instruction
-    special_commands = ["--install-sdks", "--sdk-status", "--telegram-setup", "--telegram-sync", "--telegram-listen", "--check", "--fix"]
+    special_commands = ["--install-sdks", "--sdk-status", "--telegram-setup", "--telegram-sync", "--telegram-listen", "--check", "--fix", "--create-venv", "--install-deps", "--setup-env"]
     if not instruction and not any(flag in sys.argv for flag in special_commands + ["--help"]):
         print("No instruction provided")
         print("Usage: python3 run.py \"your instruction here\"")
@@ -2235,6 +2245,63 @@ def main():
                 print("\n⚠️ Cleanup may have encountered some issues")
         except Exception as e:
             print(f"❌ Failed to run cleanup: {e}")
+        sys.exit(0)
+    
+    # Check for virtual environment creation request
+    if "--create-venv" in sys.argv:
+        print("🔧 Creating virtual environment...")
+        print("=" * 50)
+        if not check_venv_prerequisites():
+            print("\n❌ Virtual environment prerequisites not met.")
+            print("This is likely because the python3-venv package is not installed.")
+            print(f"\nTry: sudo apt install python3.{sys.version_info.minor}-venv")
+            sys.exit(1)
+        
+        if create_virtual_environment():
+            print("\n✅ Virtual environment created successfully")
+            print(f"Virtual environment location: {Path(__file__).parent / VENV_DIR}")
+        else:
+            print("\n❌ Failed to create virtual environment")
+            sys.exit(1)
+        sys.exit(0)
+    
+    # Check for dependency installation request
+    if "--install-deps" in sys.argv:
+        print("📦 Installing dependencies...")
+        print("=" * 50)
+        venv_python = get_venv_python_path()
+        if not venv_python:
+            print("❌ Virtual environment not found.")
+            print("Please create a virtual environment first with --create-venv")
+            sys.exit(1)
+        
+        if install_dependencies():
+            print("\n✅ Dependencies installed successfully")
+        else:
+            print("\n❌ Failed to install dependencies")
+            sys.exit(1)
+        sys.exit(0)
+    
+    # Check for combined setup environment request
+    if "--setup-env" in sys.argv:
+        print("🚀 Setting up environment (venv + dependencies)...")
+        print("=" * 50)
+        if not check_venv_prerequisites():
+            print("\n❌ Virtual environment prerequisites not met.")
+            print("This is likely because the python3-venv package is not installed.")
+            print(f"\nTry: sudo apt install python3.{sys.version_info.minor}-venv")
+            sys.exit(1)
+        
+        if not create_virtual_environment():
+            print("\n❌ Failed to create virtual environment")
+            sys.exit(1)
+        
+        if not install_dependencies():
+            print("\n❌ Failed to install dependencies")
+            sys.exit(1)
+        
+        print("\n✅ Environment setup completed successfully")
+        print(f"Virtual environment location: {Path(__file__).parent / VENV_DIR}")
         sys.exit(0)
     
     # Model selection - only prompt if not using --no-prompt flag
