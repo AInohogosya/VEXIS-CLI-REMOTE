@@ -235,8 +235,19 @@ class MessageHandler:
             })
             
             # Handle task queuing
+            # Create a simple sender object for Bot API mode
+            class SimpleSender:
+                def __init__(self, username, user_id, first_name, chat_id):
+                    self.username = username
+                    self.id = user_id
+                    self.phone = None
+                    self.first_name = first_name
+                    self.chat_id = chat_id
+            
+            sender = SimpleSender(sender_username, sender_id, bot_message.first_name, bot_message.chat_id)
+            
             task_data = {
-                "sender": None,  # Bot API doesn't have full sender object
+                "sender": sender,
                 "message": message_text,
                 "sender_username": sender_username,
                 "sender_id": sender_id

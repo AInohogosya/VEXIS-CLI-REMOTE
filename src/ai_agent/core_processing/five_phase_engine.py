@@ -818,10 +818,12 @@ class FivePhaseEngine:
                     print("")
                     print(context.final_summary)
                     
-                    # Send via Telegram if enabled
-                    self._init_telegram()
-                    if self._telegram_enabled:
-                        self._send_via_telegram(summary)
+                    # Send via Telegram if enabled (only in terminal mode, not Telegram listener mode)
+                    runtime_mode = self.config.get("runtime_mode", "terminal")
+                    if runtime_mode != "telegram":
+                        self._init_telegram()
+                        if self._telegram_enabled:
+                            self._send_via_telegram(summary)
                     
                     return True
                 else:

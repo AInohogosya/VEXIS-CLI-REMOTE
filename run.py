@@ -1148,6 +1148,11 @@ def start_telegram_listener():
                         )
 
                     # Send result back to the sender
+                    print(f"{Colors.CYAN}DEBUG: final_summary exists: {bool(context.final_summary)}{Colors.RESET}")
+                    print(f"{Colors.CYAN}DEBUG: message_sender exists: {bool(message_sender)}{Colors.RESET}")
+                    if context.final_summary:
+                        print(f"{Colors.CYAN}DEBUG: final_summary length: {len(context.final_summary)}{Colors.RESET}")
+                    
                     if context.final_summary and message_sender:
                         await send_result_via_telegram(client, message_sender, context.final_summary)
                         print(f"{Colors.GREEN}Result sent successfully via Telegram{Colors.RESET}")
@@ -1157,6 +1162,9 @@ def start_telegram_listener():
                             message_sender,
                             "✅ Task completed, but no Phase 5 summary text was produced."
                         )
+                        print(f"{Colors.YELLOW}Sent 'no summary' message via Telegram{Colors.RESET}")
+                    else:
+                        print(f"{Colors.RED}Cannot send result: message_sender is None{Colors.RESET}")
             
             except KeyboardInterrupt:
                 print(f"\n{Colors.YELLOW}Task interrupted by user{Colors.RESET}")
@@ -1203,8 +1211,11 @@ def start_telegram_listener():
     async def send_result_via_telegram(client, sender, message):
         """Send Phase 5 output back to the message sender"""
         try:
+            # In Bot API mode, use chat_id if available
+            if client.use_bot_http_api and hasattr(sender, 'chat_id'):
+                recipient = str(sender.chat_id)
             # Convert User object to string identifier (username, phone, or id)
-            if hasattr(sender, 'username') and sender.username:
+            elif hasattr(sender, 'username') and sender.username:
                 recipient = sender.username
             elif hasattr(sender, 'phone') and sender.phone:
                 recipient = sender.phone
