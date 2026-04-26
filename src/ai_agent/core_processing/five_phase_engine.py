@@ -603,10 +603,6 @@ class FivePhaseEngine:
             "detail": detail,
         })
 
-        runtime_mode = self.config.get("runtime_mode", "terminal")
-        if runtime_mode == "telegram":
-            return
-
         try:
             from ..utils.config import load_config
 
