@@ -323,7 +323,11 @@ class FivePhaseEngine:
                 context.end_time = time.time()
                 self._cleanup_telegram()
                 return context
-            
+
+            # Initialize Telegram before Phase 2 so real-time updates can be sent
+            # as soon as each Phase 2 iteration ends (not deferred until Phase 5).
+            self._init_telegram()
+
             # Phase 2-4 Loop: Extract, Execute, Evaluate until complete
             while context.iteration_count < context.max_iterations:
                 # Check timeout before each iteration
