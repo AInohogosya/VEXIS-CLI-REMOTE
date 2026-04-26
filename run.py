@@ -1097,6 +1097,17 @@ def start_telegram_listener():
 
                 engine = FivePhaseEngine(provider=provider, model=model, config=engine_config)
 
+                 # Record user message to conversation history
+                try:
+                    from ai_agent.core_processing.terminal_history import get_terminal_history
+                    terminal_history = get_terminal_history()
+                    sender_name = ""
+                    if sender_info:
+                        sender_name = getattr(sender_info, 'username', '') or getattr(sender_info, 'id', '') or getattr(sender_info, 'phone', '') or ""
+                    terminal_history.record_conversation_message("user", prompt_text, sender_name)
+                except Exception:
+                    pass  # Non-critical, continue even if recording fails
+
                 # Execute instruction with error handling
                 context = engine.execute_instruction(prompt_text)
                 
@@ -1131,12 +1142,20 @@ def start_telegram_listener():
                         f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
                     )
 
-                # Check if execution failed
+                 # Check if execution failed
                 if context.current_phase.value == "failed" or context.error:
                     error_msg = f"Task execution failed.\n\nError: {context.error}\nPhase: {context.current_phase.value}"
                     if message_sender:
                         await send_error_via_telegram(client, message_sender, error_msg, prompt_text)
                     print(f"{Colors.RED}Task failed: {context.error}{Colors.RESET}")
+                    
+                    # Record error response to conversation history
+                    try:
+                        from ai_agent.core_processing.terminal_history import get_terminal_history
+                        terminal_history = get_terminal_history()
+                        terminal_history.record_conversation_message("assistant", error_msg, "AI")
+                    except Exception:
+                        pass  # Non-critical
                 else:
                     # Send Phase 2 objective summary first (Telegram mode output)
                     phase2_goal_summary = context.metadata.get("phase2_goal_summary")
@@ -1148,15 +1167,27 @@ def start_telegram_listener():
                         )
 
                     # Send result back to the sender
+                    result_message = ""
                     if context.final_summary and message_sender:
-                        await send_result_via_telegram(client, message_sender, context.final_summary)
+                        result_message = context.final_summary
+                        await send_result_via_telegram(client, message_sender, result_message)
                         print(f"{Colors.GREEN}Result sent successfully via Telegram{Colors.RESET}")
                     elif message_sender:
+                        result_message = "✅ Task completed, but no Phase 5 summary text was produced."
                         await send_result_via_telegram(
                             client,
                             message_sender,
-                            "✅ Task completed, but no Phase 5 summary text was produced."
+                            result_message
                         )
+                    
+                    # Record assistant response to conversation history
+                    if result_message:
+                        try:
+                            from ai_agent.core_processing.terminal_history import get_terminal_history
+                            terminal_history = get_terminal_history()
+                            terminal_history.record_conversation_message("assistant", result_message, "AI")
+                        except Exception:
+                            pass  # Non-critical, continue even if recording fails
             
             except KeyboardInterrupt:
                 print(f"\n{Colors.YELLOW}Task interrupted by user{Colors.RESET}")

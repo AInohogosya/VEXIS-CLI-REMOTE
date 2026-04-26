@@ -61,7 +61,10 @@ class PromptTemplate:
     def _load_templates(self) -> Dict[str, str]:
         """Load prompt templates for 5-Phase CLI Architecture"""
         return {
-            TaskType.PHASE1_COMMAND_SUGGESTION.value: '''I have received the instruction: "{user_prompt}". What commands should I run to carry this out? Please tell me. I can only use terminal commands, so do not suggest GUI operations. The OS I am using is {os_info}.''',
+             TaskType.PHASE1_COMMAND_SUGGESTION.value: '''I have received the instruction: "{user_prompt}". What commands should I run to carry this out? Please tell me. I can only use terminal commands, so do not suggest GUI operations. The OS I am using is {os_info}.
+
+Here is the conversation history so far:
+{conversation_history_text}''',
 
             TaskType.PHASE2_GOAL_SUMMARY.value: '''Please read the following original plan content and summarize what is ultimately being achieved in exactly one sentence: {phase_1_output}''',
 
@@ -266,6 +269,7 @@ class ModelRunner:
             format_vars.update(request.context)
 
         format_vars.setdefault("os_info", "Unknown OS")
+        format_vars.setdefault("conversation_history_text", "(No conversation history)")
 
         try:
             formatted_prompt = template.format(**format_vars)
