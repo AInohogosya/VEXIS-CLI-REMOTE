@@ -33,6 +33,7 @@ def test_record_phase2_update_sends_telegram_update_in_telegram_mode(monkeypatch
     engine = FivePhaseEngine(config={"runtime_mode": "telegram"})
     context = PipelineContext(user_prompt="test prompt")
     context.iteration_count = 3
+    context.phase2_goal_summary = "Deploy the app successfully."
 
     monkeypatch.setattr(
         "src.ai_agent.utils.config.load_config",
@@ -49,6 +50,7 @@ def test_record_phase2_update_sends_telegram_update_in_telegram_mode(monkeypatch
     message, update_type = sent_payloads[-1]
     assert "Phase 2 update (iteration 3)" in message
     assert "Status: failed" in message
+    assert "Goal summary: Deploy the app successfully." in message
     assert update_type == "phase2_end_update"
 
 

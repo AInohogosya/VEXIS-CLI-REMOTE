@@ -614,10 +614,14 @@ class FivePhaseEngine:
             if not self._telegram_enabled:
                 return
 
+            goal_summary = context.phase2_goal_summary or context.metadata.get("phase2_goal_summary")
+            goal_summary_line = f"\nGoal summary: {goal_summary}" if goal_summary else ""
+
             message = (
                 f"📍 Phase 2 update (iteration {context.iteration_count})\n"
                 f"Status: {status}\n"
                 f"{detail}"
+                f"{goal_summary_line}"
             )
             self._send_via_telegram(message, update_type="phase2_end_update")
         except Exception as e:
