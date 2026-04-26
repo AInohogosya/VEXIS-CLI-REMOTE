@@ -156,8 +156,8 @@ class FivePhaseEngine:
             except Exception as e:
                 self.logger.warning(f"Error during Telegram cleanup: {e}")
     
-    def _send_via_telegram(self, message: str):
-        """Send message via Telegram to configured recipients (synchronous wrapper)"""
+    def _send_via_telegram(self, message: str, update_type: str = "update"):
+        """Send message via Telegram to configured recipients (synchronous wrapper)."""
         if not self._telegram_enabled or not self._telegram_client:
             return
         
@@ -174,7 +174,7 @@ class FivePhaseEngine:
                     contact = self._telegram_contact_manager.get_contact_by_name(recipient_name)
                     if contact:
                         await self._telegram_client.send_message(contact["identifier"], message)
-                        self.logger.info(f"Sent Phase 5 output to {recipient_name} via Telegram")
+                        self.logger.info(f"Sent Telegram {update_type} to {recipient_name}")
             
             self._telegram_loop.run_until_complete(do_send())
             
@@ -595,13 +595,33 @@ class FivePhaseEngine:
         return False
 
     def _record_phase2_update(self, context: PipelineContext, status: str, detail: str) -> None:
-        """Record per-iteration Phase 2 completion updates for Telegram delivery."""
+        """Record per-iteration Phase 2 completion updates and send immediately when enabled."""
         updates = context.metadata.setdefault("phase2_updates", [])
         updates.append({
             "status": status,
             "iteration": context.iteration_count,
             "detail": detail,
         })
+
+        try:
+            from ..utils.config import load_config
+
+            config = load_config()
+            if not getattr(config.telegram, "send_phase2_end_updates", True):
+                return
+
+            self._init_telegram()
+            if not self._telegram_enabled:
+                return
+
+            message = (
+                f"📍 Phase 2 update (iteration {context.iteration_count})\n"
+                f"Status: {status}\n"
+                f"{detail}"
+            )
+            self._send_via_telegram(message, update_type="phase2_end_update")
+        except Exception as e:
+            self.logger.warning(f"Failed to send Phase 2 end update via Telegram: {e}")
 
     def _summarize_phase2_goal(self, phase_input: str) -> Optional[str]:
         """
@@ -823,7 +843,7 @@ class FivePhaseEngine:
                     if runtime_mode != "telegram":
                         self._init_telegram()
                         if self._telegram_enabled:
-                            self._send_via_telegram(summary)
+                            self._send_via_telegram(summary, update_type="phase5_summary")
                     
                     return True
                 else:
