@@ -1100,15 +1100,6 @@ def start_telegram_listener():
                 # Execute instruction with error handling
                 context = engine.execute_instruction(prompt_text)
                 
-                # Always send Phase 2 objective summary if available
-                phase2_goal_summary = context.metadata.get("phase2_goal_summary")
-                if phase2_goal_summary and message_sender:
-                    await send_result_via_telegram(
-                        client,
-                        message_sender,
-                        f"🎯 Phase 2 goal summary:\n{phase2_goal_summary}"
-                    )
-
                 # Check if execution failed
                 if context.current_phase.value == "failed" or context.error:
                     error_msg = f"Task execution failed.\n\nError: {context.error}\nPhase: {context.current_phase.value}"
