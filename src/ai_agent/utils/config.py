@@ -8,7 +8,7 @@ import yaml
 import json
 from typing import Dict, Any, Optional, Union
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from .exceptions import ConfigurationError, ValidationError
 
 
@@ -126,7 +126,6 @@ class TelegramConfig:
     authorized_users: list = field(default_factory=list)
     output_recipients: list = field(default_factory=list)
     enable_input_listener: bool = False
-    send_phase2_end_updates: bool = True
 
 
 @dataclass
@@ -267,6 +266,15 @@ class ConfigManager:
         try:
             # Get API config dict
             api_config_dict = self._raw_config.get("api", {})
+            telegram_config_dict = self._raw_config.get("telegram", {})
+
+            # Ignore legacy/unknown keys in telegram config (e.g. removed phase2 flags)
+            allowed_telegram_keys = {f.name for f in fields(TelegramConfig)}
+            filtered_telegram_config_dict = {
+                key: value
+                for key, value in telegram_config_dict.items()
+                if key in allowed_telegram_keys
+            }
             
             return Config(
                 logging=LoggingConfig(**self._raw_config.get("logging", {})),
@@ -274,7 +282,7 @@ class ConfigManager:
                 security=SecurityConfig(**self._raw_config.get("security", {})),
                 performance=PerformanceConfig(**self._raw_config.get("performance", {})),
                 engine=EngineConfig(**self._raw_config.get("engine", {})),
-                telegram=TelegramConfig(**self._raw_config.get("telegram", {})),
+                telegram=TelegramConfig(**filtered_telegram_config_dict),
                 platform=self._raw_config.get("platform", {}),
                 custom=self._raw_config.get("custom", {}),
             )

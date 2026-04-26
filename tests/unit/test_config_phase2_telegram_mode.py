@@ -1,21 +1,16 @@
-"""Tests for Telegram Phase 2 end-update config mode."""
+"""Tests for Telegram config without Phase 2 end-update mode."""
 
 from pathlib import Path
 
-from src.ai_agent.utils.config import ConfigManager
+from src.ai_agent.utils.config import ConfigManager, TelegramConfig
 
 
-def test_send_phase2_end_updates_defaults_to_true(tmp_path: Path):
-    cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text("telegram:\n  enabled: true\n")
-
-    manager = ConfigManager(cfg_file)
-    config = manager.load_config()
-
-    assert config.telegram.send_phase2_end_updates is True
+def test_telegram_config_has_no_phase2_end_update_flag():
+    telegram_config = TelegramConfig()
+    assert not hasattr(telegram_config, "send_phase2_end_updates")
 
 
-def test_send_phase2_end_updates_can_be_disabled(tmp_path: Path):
+def test_legacy_phase2_end_update_flag_is_ignored(tmp_path: Path):
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(
         "telegram:\n"
@@ -26,4 +21,5 @@ def test_send_phase2_end_updates_can_be_disabled(tmp_path: Path):
     manager = ConfigManager(cfg_file)
     config = manager.load_config()
 
-    assert config.telegram.send_phase2_end_updates is False
+    assert config.telegram.enabled is True
+    assert not hasattr(config.telegram, "send_phase2_end_updates")

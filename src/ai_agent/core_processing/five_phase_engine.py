@@ -595,33 +595,13 @@ class FivePhaseEngine:
         return False
 
     def _record_phase2_update(self, context: PipelineContext, status: str, detail: str) -> None:
-        """Record per-iteration Phase 2 completion updates and send immediately when enabled."""
+        """Record per-iteration Phase 2 completion updates."""
         updates = context.metadata.setdefault("phase2_updates", [])
         updates.append({
             "status": status,
             "iteration": context.iteration_count,
             "detail": detail,
         })
-
-        try:
-            from ..utils.config import load_config
-
-            config = load_config()
-            if not getattr(config.telegram, "send_phase2_end_updates", True):
-                return
-
-            self._init_telegram()
-            if not self._telegram_enabled:
-                return
-
-            message = (
-                f"📍 Phase 2 update (iteration {context.iteration_count})\n"
-                f"Status: {status}\n"
-                f"{detail}"
-            )
-            self._send_via_telegram(message, update_type="phase2_end_update")
-        except Exception as e:
-            self.logger.warning(f"Failed to send Phase 2 end update via Telegram: {e}")
 
     def _summarize_phase2_goal(self, phase_input: str) -> Optional[str]:
         """
