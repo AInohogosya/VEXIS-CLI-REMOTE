@@ -21,6 +21,7 @@ def test_record_phase2_update_records_failure_metadata():
     engine = FivePhaseEngine(config={"runtime_mode": "telegram"})
     context = PipelineContext(user_prompt="test prompt")
     context.iteration_count = 3
+    context.phase2_goal_summary = "Deploy the app successfully."
 
     engine._record_phase2_update(context, status="failed", detail="Phase 2 ended without a code block.")
 
