@@ -432,6 +432,68 @@ class FivePhaseEngine:
             self._cleanup_telegram()
             return context
     
+    def _build_conversation_context(self) -> str:
+        """
+        Build conversation context from terminal history entries.
+        
+        Constructs a formatted conversation history string from
+        recent terminal entries (commands, outputs, errors) to provide
+        context for Phase 1 command suggestion.
+        
+        Returns:
+            Formatted conversation context string
+        """
+        recent_entries = self.terminal_history.get_recent_output(count=50)
+        
+        if not recent_entries:
+            return ""
+        
+        conversation_lines = []
+        conversation_lines.append("\n")
+        conversation_lines.append("Recent conversation history (commands and their results):")
+        conversation_lines.append("=" * 60)
+        
+        i = 0
+        while i < len(recent_entries):
+            entry = recent_entries[i]
+            
+            if entry.entry_type == TerminalEntryType.COMMAND:
+                timestamp_str = time.strftime('%H:%M:%S', time.localtime(entry.timestamp))
+                conversation_lines.append(f"\n[{timestamp_str}] $ {entry.content}")
+                
+                # Gather following output/error entries
+                j = i + 1
+                output_lines = []
+                error_lines = []
+                while j < len(recent_entries):
+                    out_entry = recent_entries[j]
+                    if out_entry.entry_type == TerminalEntryType.COMMAND:
+                        break
+                    if out_entry.entry_type == TerminalEntryType.OUTPUT and out_entry.content.strip():
+                        output_lines.append(out_entry.content)
+                    elif out_entry.entry_type == TerminalEntryType.ERROR and out_entry.content.strip():
+                        error_lines.append(out_entry.content)
+                    j += 1
+                
+                if output_lines:
+                    conversation_lines.append("  Result:")
+                    for line in "\n".join(output_lines).split('\n'):
+                        if line.strip():
+                            conversation_lines.append(f"    {line}")
+                
+                if error_lines:
+                    conversation_lines.append("  Error:")
+                    for line in "\n".join(error_lines).split('\n'):
+                        if line.strip():
+                            conversation_lines.append(f"    {line}")
+                
+                i = j
+            else:
+                i += 1
+        
+        conversation_lines.append("\n" + "=" * 60)
+        return "\n".join(conversation_lines)
+
     def _run_phase1(self, context: PipelineContext) -> bool:
         """
         Phase 1: Command Suggestion
@@ -452,6 +514,9 @@ class FivePhaseEngine:
             try:
                 os_info = context.metadata.get("os_info", self._get_os_info())
                 
+                # Build conversation context from terminal history
+                conversation_context = self._build_conversation_context()
+                
                 # Create request for Phase 1
                 request = ModelRequest(
                     task_type=TaskType.PHASE1_COMMAND_SUGGESTION,
@@ -459,6 +524,8 @@ class FivePhaseEngine:
                     context={
                         "user_prompt": context.user_prompt,
                         "os_info": os_info,
+                        "conversation_history": conversation_context,
+                        "conversation_history_text": conversation_context if conversation_context else "(No previous conversation - first request)",
                     },
                     max_tokens=4000,
                     temperature=0.7

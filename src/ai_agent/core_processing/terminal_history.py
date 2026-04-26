@@ -815,6 +815,28 @@ class TerminalHistory:
             self.logger.info(f"Terminal history cleared for session: {self.session_id}")
         except Exception as e:
             self.logger.error(f"Error clearing terminal history: {e}")
+
+    def record_conversation_message(self, role: str, content: str, sender: Optional[str] = None) -> None:
+        """
+        Record a conversation message in terminal history.
+        
+        Args:
+            role: Message role - 'user' or 'assistant'  
+            content: Message content
+            sender: Optional sender identifier
+        """
+        try:
+            entry = TerminalEntry(
+                timestamp=time.time(),
+                entry_type=TerminalEntryType.COMMAND if role == "user" else TerminalEntryType.OUTPUT,
+                content=f"[{'USER' if role == 'user' else 'ASSISTANT'}] {content}",
+                command=content if role == "user" else None,
+                working_directory=str(self._current_directory),
+                metadata={"role": role, "sender": sender} if sender else {"role": role}
+            )
+            self.terminal_session.entries.append(entry)
+        except Exception as e:
+            self.logger.error(f"Error recording conversation message: {e}")
     
     def load_session(self, session_id: str) -> bool:
         """
