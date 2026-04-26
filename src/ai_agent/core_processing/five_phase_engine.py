@@ -565,6 +565,22 @@ class FivePhaseEngine:
                     )
                     self.logger.info("Phase 2 completed successfully",
                                    commands_length=len(commands))
+
+                    # Send Phase 2 completion update via Telegram if enabled
+                    try:
+                        from ..utils.config import load_config
+                        cfg = load_config()
+                        if cfg.telegram.send_phase2_end_updates:
+                            # Build message content
+                            message_parts = ["🎯 Phase 2 Completed\n"]
+                            if context.phase2_goal_summary:
+                                message_parts.append(f"Goal: {context.phase2_goal_summary}\n")
+                            message_parts.append(f"\nExtracted commands:\n```\n{commands}\n```")
+                            telegram_message = "".join(message_parts)
+                            self._send_via_telegram(telegram_message)
+                    except Exception as e:
+                        self.logger.warning(f"Failed to send Phase 2 Telegram update: {e}")
+
                     return True
                 else:
                     self.logger.warning(f"Phase 2: No code block found in attempt {attempt + 1}")
